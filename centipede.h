@@ -12,6 +12,6 @@
 #define QUIT 'q'
 #define PTHREAD_MUTEX_NORMAL 0
 void runCentipede();
-
+void movePlayer();
 
 #endif
