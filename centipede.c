@@ -76,7 +76,6 @@ int main(int argc, char**argv)
 }
 
 void movePlayer() {
-    fd_set set; // what to check for our select call
     bool gameRunning = true;
     characterRow = BOARD_BOTTOM+1;
     characterCol = BOARD_MIDDLE;
@@ -89,16 +88,8 @@ void movePlayer() {
     pthread_mutex_unlock(&board_mutex);
 
     while(gameRunning){
-        FD_ZERO(&set);
-        FD_SET(STDIN_FILENO, &set);
-        struct timespec timeout = getTimeout(1); /* duration of one tick */
-        int ret = select(FD_SETSIZE, &set, NULL, NULL, &timeout);	
-        if (ret == 0) {
-            printf("ret = %d\n", ret);
-            printf(" timeout\n");
-        }
         while(gameRunning){
-            if(gameRunning && ret >= 1) {
+            if(gameRunning) {
                 char c = getchar();
                 if (c == QUIT) {
                     gameOver = true;
@@ -212,7 +203,18 @@ void centipedeBullet() {
 }
 
 void keyboard() {
-    
+    fd_set set; // what to check for our select call
+    int ret;
+    while(true) {
+        FD_ZERO(&set);
+        FD_SET(STDIN_FILENO, &set);
+        struct timespec timeout = getTimeout(1); /* duration of one tick */
+        ret = select(FD_SETSIZE, &set, NULL, NULL, &timeout);	
+        if (ret == 0) {
+            printf("ret = %d\n", ret);
+            printf(" timeout\n");
+        }
+    }
 }
 
 void refresh() {
