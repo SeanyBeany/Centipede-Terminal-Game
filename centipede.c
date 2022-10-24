@@ -205,16 +205,15 @@ void centipedeBullet() {
 void keyboard() {
     fd_set set; // what to check for our select call
     int ret;
-    while(true) {
-        FD_ZERO(&set);
-        FD_SET(STDIN_FILENO, &set);
-        struct timespec timeout = getTimeout(1); /* duration of one tick */
-        ret = select(FD_SETSIZE, &set, NULL, NULL, &timeout);	
-        if (ret == 0) {
-            printf("ret = %d\n", ret);
-            printf(" timeout\n");
-        }
+    FD_ZERO(&set);
+    FD_SET(STDIN_FILENO, &set);
+    struct timespec timeout = getTimeout(1); /* duration of one tick */
+    ret = select(FD_SETSIZE, &set, NULL, NULL, &timeout);	
+    if (ret == 0) {
+    printf("ret = %d\n", ret);
+    printf(" timeout\n");
     }
+    pthread_exit(&t4);
 }
 
 void refresh() {
