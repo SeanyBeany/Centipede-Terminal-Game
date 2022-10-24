@@ -25,5 +25,6 @@ void bullet();
 void centipedeBullet();
 void refresh();
 void keyboard();
+void upkeep();
 
 #endif
