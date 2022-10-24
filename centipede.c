@@ -46,6 +46,7 @@ pthread_mutex_t board_mutex; // mutex for board
 pthread_t t1, t2;
 int characterRow;
 int characterCol;
+int gameOver = 0;
 
 int main(int argc, char**argv) 
 {
@@ -54,12 +55,17 @@ int main(int argc, char**argv)
     if (pthread_create(&t1, NULL, (void *) &movePlayer, NULL) != 0){
         perror("pthread_create");
     }
-    sleep(10);
-    
-    finalKeypress();
-    consoleFinish();
-    if (pthread_join(t1, NULL) != 0) {
-        perror("pthread_join");
+    while(true) {
+        if(gameOver == 1){
+            pthread_mutex_lock(&board_mutex);
+            finalKeypress();
+            consoleFinish();
+            pthread_mutex_unlock(&board_mutex);
+            if (pthread_join(t1, NULL) != 0) {
+                perror("pthread_join");
+            }
+            break;
+        }
     }
 }
 
@@ -90,7 +96,9 @@ void movePlayer() {
                 char c = getchar();
 
                 if (c == QUIT) {
+                    gameOver = true;
                     gameRunning = false;
+                    pthread_mutex_unlock(&board_mutex);
                 }
                 else if (c == SPACE) {
                     pthread_create(&t2, NULL, (void *) &bullet, NULL);
@@ -115,10 +123,9 @@ void movePlayer() {
                             characterRow-= 1;
                         }
                     } else if (c == SPACE) {
-                        pthread_create(&t1, NULL, (void *) &bullet, NULL);
-                    }
-                    else if (c == QUIT) {
-                        gameRunning = false;
+                        pthread_create(&t2, NULL, (void *) &bullet, NULL);
+                    } else if (c == 'e') {
+                        pthread_create(&t2, NULL, (void *) &centipedeBullet, NULL);
                     }
 
                     consoleDrawImage(characterRow, characterCol, characterTile, CHARACTER_HEIGHT);
@@ -134,15 +141,13 @@ void movePlayer() {
 
 void bullet() {
     bool gameRunning = true;
-    int row = 15;
-    int col = 30;
     char* BULLET[1][1] = {{"|"}};
     char** bulletTile = BULLET[0];
     int bulletHeight = 0;
     int hit = 0;
     int bulletRow = characterRow;
     int bulletCol = characterCol;
-    
+
     while(!hit){
         sleepTicks(15);
         if(bulletRow-bulletHeight != 2) {
@@ -151,6 +156,38 @@ void bullet() {
                 consoleClearImage(bulletRow-bulletHeight, bulletCol, BULLET_HEIGHT, strlen(bulletTile[0]));
             }
             bulletHeight++;
+            consoleDrawImage(bulletRow-bulletHeight, bulletCol, bulletTile, BULLET_HEIGHT);
+            consoleRefresh();
+            pthread_mutex_unlock(&board_mutex);
+        }
+        else {
+            pthread_mutex_lock(&board_mutex);
+            consoleClearImage(bulletRow-bulletHeight, bulletCol, BULLET_HEIGHT, strlen(bulletTile[0]));
+            consoleRefresh();
+            pthread_mutex_unlock(&board_mutex);
+            hit = 1;
+        }
+    }
+    pthread_exit(&t2);
+}
+
+void centipedeBullet() {
+    bool gameRunning = true;
+    char* BULLET[1][1] = {{"."}};
+    char** bulletTile = BULLET[0];
+    int bulletHeight = 0;
+    int hit = 0;
+    int bulletRow = 1;
+    int bulletCol = 33;
+    
+    while(!hit){
+        sleepTicks(15);
+        if(bulletRow-bulletHeight != 15) {
+            pthread_mutex_lock(&board_mutex);
+            if(bulletHeight <= 15 && bulletHeight != 0){
+                consoleClearImage(bulletRow-bulletHeight, bulletCol, BULLET_HEIGHT, strlen(bulletTile[0]));
+            }
+            bulletHeight--;
             consoleDrawImage(bulletRow-bulletHeight, bulletCol, bulletTile, BULLET_HEIGHT);
             consoleRefresh();
             pthread_mutex_unlock(&board_mutex);

@@ -22,5 +22,6 @@
 void runCentipede();
 void movePlayer();
 void bullet();
+void centipedeBullet();
 
 #endif
