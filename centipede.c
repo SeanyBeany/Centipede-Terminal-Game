@@ -43,7 +43,7 @@ char *GAME_BOARD[] = {
 
 
 pthread_mutex_t board_mutex; // mutex for board
-pthread_t t1, t2;
+pthread_t t1, t2, t3, t4;
 int characterRow;
 int characterCol;
 int gameOver = 0;
@@ -53,6 +53,12 @@ int main(int argc, char**argv)
     pthread_mutex_init(&board_mutex, NULL);
     if (consoleInit(GAME_ROWS, GAME_COLS, GAME_BOARD));
     if (pthread_create(&t1, NULL, (void *) &movePlayer, NULL) != 0){
+        perror("pthread_create");
+    }
+    if (pthread_create(&t3, NULL, (void *) &refresh, NULL) != 0){
+        perror("pthread_create");
+    }
+    if (pthread_create(&t4, NULL, (void *) &keyboard, NULL) != 0){
         perror("pthread_create");
     }
     while(true) {
@@ -79,7 +85,7 @@ void movePlayer() {
 
     pthread_mutex_lock(&board_mutex);
     consoleDrawImage(characterRow, characterCol, characterTile, 1);
-    consoleRefresh();
+    
     pthread_mutex_unlock(&board_mutex);
 
     while(gameRunning){
@@ -94,7 +100,6 @@ void movePlayer() {
         while(gameRunning){
             if(gameRunning && ret >= 1) {
                 char c = getchar();
-
                 if (c == QUIT) {
                     gameOver = true;
                     gameRunning = false;
@@ -129,7 +134,7 @@ void movePlayer() {
                     }
 
                     consoleDrawImage(characterRow, characterCol, characterTile, CHARACTER_HEIGHT);
-                    consoleRefresh();
+                    
 
                     pthread_mutex_unlock(&board_mutex);
                 }
@@ -157,13 +162,13 @@ void bullet() {
             }
             bulletHeight++;
             consoleDrawImage(bulletRow-bulletHeight, bulletCol, bulletTile, BULLET_HEIGHT);
-            consoleRefresh();
+            
             pthread_mutex_unlock(&board_mutex);
         }
         else {
             pthread_mutex_lock(&board_mutex);
             consoleClearImage(bulletRow-bulletHeight, bulletCol, BULLET_HEIGHT, strlen(bulletTile[0]));
-            consoleRefresh();
+            
             pthread_mutex_unlock(&board_mutex);
             hit = 1;
         }
@@ -182,23 +187,39 @@ void centipedeBullet() {
     
     while(!hit){
         sleepTicks(15);
-        if(bulletRow-bulletHeight != 15) {
+        if (bulletRow-bulletHeight == characterRow && bulletCol == characterCol) {
+            
+        }
+        else if(bulletRow-bulletHeight != 15) {
             pthread_mutex_lock(&board_mutex);
             if(bulletHeight <= 15 && bulletHeight != 0){
                 consoleClearImage(bulletRow-bulletHeight, bulletCol, BULLET_HEIGHT, strlen(bulletTile[0]));
             }
             bulletHeight--;
             consoleDrawImage(bulletRow-bulletHeight, bulletCol, bulletTile, BULLET_HEIGHT);
-            consoleRefresh();
+            
             pthread_mutex_unlock(&board_mutex);
         }
         else {
             pthread_mutex_lock(&board_mutex);
             consoleClearImage(bulletRow-bulletHeight, bulletCol, BULLET_HEIGHT, strlen(bulletTile[0]));
-            consoleRefresh();
+            
             pthread_mutex_unlock(&board_mutex);
             hit = 1;
         }
     }
     pthread_exit(&t2);
+}
+
+void keyboard() {
+    
+}
+
+void refresh() {
+    while(true) {
+        sleepTicks(1);
+        pthread_mutex_lock(&board_mutex);
+        consoleRefresh();
+        pthread_mutex_unlock(&board_mutex);
+    }
 }
