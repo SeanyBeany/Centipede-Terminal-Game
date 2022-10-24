@@ -27,5 +27,6 @@ void centipedeBullet();
 void refresh();
 void keyboard();
 void upkeep();
+void fireRate();
 
 #endif

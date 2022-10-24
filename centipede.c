@@ -44,7 +44,9 @@ char *GAME_BOARD[] = {
 
 pthread_mutex_t board_mutex; // mutex for board
 pthread_mutex_t end_mutex; // mutex for ending program
+pthread_mutex_t fire_mutex; // mutex to cap fire rate
 pthread_cond_t end_signal_mutex; // mutex for signal to end program
+pthread_cond_t fire_mutex_signal; // mutex for signal to cap fire rate
 pthread_t t1, t2, t3, t4, t5;
 int characterRow;
 int characterCol;
@@ -53,6 +55,8 @@ int gameOver = 0;
 void centipedeMain(int argc, char**argv) 
 {
     pthread_mutex_init(&board_mutex, NULL);
+    pthread_mutex_init(&fire_mutex, NULL);
+    pthread_mutex_init(&end_mutex, NULL);
     if (consoleInit(GAME_ROWS, GAME_COLS, GAME_BOARD));
     if (pthread_create(&t1, NULL, (void *) &movePlayer, NULL) != 0){
         perror("pthread_create");
@@ -64,6 +68,10 @@ void centipedeMain(int argc, char**argv)
         perror("pthread_create");
     }
     if (pthread_create(&t4, NULL, (void *) &upkeep, NULL) != 0){
+        perror("pthread_create");
+    }
+
+    if (pthread_create(&t5, NULL, (void *) &fireRate, NULL) != 0){
         perror("pthread_create");
     }
     
@@ -140,9 +148,10 @@ void bullet() {
     char** bulletTile = BULLET[0];
     int bulletHeight = 0;
     int hit = 0;
+    
+    pthread_cond_wait(&fire_mutex_signal, &fire_mutex);  
     int bulletRow = characterRow;
     int bulletCol = characterCol;
-
     while(!hit){
         sleepTicks(15);
         if(bulletRow-bulletHeight != 2) {
@@ -164,6 +173,13 @@ void bullet() {
         }
     }
     pthread_exit(&t2);
+}
+
+void fireRate() {
+    while(true) {
+        pthread_cond_signal(&fire_mutex_signal);
+        sleepTicks(30);
+    }
 }
 
 void centipedeBullet() {
@@ -198,6 +214,7 @@ void centipedeBullet() {
             hit = 1;
         }
     }
+    
     pthread_exit(&t2);
 }
 
@@ -223,6 +240,7 @@ void refresh() {
         pthread_mutex_unlock(&board_mutex);
     }
 }
+
 
 void upkeep() {
     char* LIVES3[1][1] = {{"3"}};
