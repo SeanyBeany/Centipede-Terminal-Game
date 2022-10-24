@@ -45,18 +45,23 @@ char *GAME_BOARD[] = {
 pthread_mutex_t board_mutex; // mutex for board
 pthread_mutex_t end_mutex; // mutex for ending program
 pthread_mutex_t fire_mutex; // mutex to cap fire rate
+pthread_mutex_t character_mutex; // mutex for character
+pthread_mutex_t character_position_mutex; // mutex for character position
 pthread_cond_t end_signal_mutex; // mutex for signal to end program
 pthread_cond_t fire_mutex_signal; // mutex for signal to cap fire rate
 pthread_t t1, t2, t3, t4, t5;
-int characterRow;
-int characterCol;
+int characterRow = BOARD_BOTTOM; // variable for character row position
+int characterCol = BOARD_MIDDLE; // variable for character column poisiton
 int gameOver = 0;
+int hit = 0; // boolean indicating whether the character has been hit or not
 
 void centipedeMain(int argc, char**argv) 
 {
     pthread_mutex_init(&board_mutex, NULL);
     pthread_mutex_init(&fire_mutex, NULL);
     pthread_mutex_init(&end_mutex, NULL);
+    pthread_mutex_init(&character_mutex, NULL);
+    pthread_mutex_init(&character_position_mutex, NULL);
     if (consoleInit(GAME_ROWS, GAME_COLS, GAME_BOARD));
     if (pthread_create(&t1, NULL, (void *) &movePlayer, NULL) != 0){
         perror("pthread_create");
@@ -89,8 +94,6 @@ void centipedeMain(int argc, char**argv)
 
 void movePlayer() {
     bool gameRunning = true;
-    characterRow = BOARD_BOTTOM+1;
-    characterCol = BOARD_MIDDLE;
     char* CHARACTER[1][1] = {{"@"}};
     char** characterTile = CHARACTER[0];
 
@@ -100,46 +103,57 @@ void movePlayer() {
     pthread_mutex_unlock(&board_mutex);
 
     while(gameRunning){
-        if(gameRunning) {
-            char c = getchar();
-            if (c == QUIT) {
-                pthread_cond_signal(&end_signal_mutex);
-                gameRunning = false;
-                pthread_mutex_unlock(&board_mutex);
-            }
-            else if (c == SPACE) {
-                pthread_create(&t2, NULL, (void *) &bullet, NULL);
-            }
-            else {
-                pthread_mutex_lock(&board_mutex);
-                consoleClearImage(characterRow,characterCol, CHARACTER_HEIGHT, strlen(characterTile[0]));
-                if (c == MOVE_LEFT) {
-                    if (characterCol >= BOARD_LEFT_SIDE){
-                        characterCol-= 1;
-                    }
-                } else if (c == MOVE_RIGHT) {
-                    if (characterCol <= BOARD_RIGHT_SIDE){
-                        characterCol+= 1;
-                    }
-                } else if (c == MOVE_DOWN) {
-                    if (characterRow <= BOARD_BOTTOM){
-                        characterRow+= 1;
-                    }
-                } else if (c == MOVE_UP) {
-                    if (characterRow >= BOARD_TOP){
-                        characterRow-= 1;
-                    }
-                } else if (c == 'e') {
-                    pthread_create(&t2, NULL, (void *) &centipedeBullet, NULL);
+        char c = getchar();
+        pthread_mutex_lock(&character_mutex);
+        if (c == QUIT) {
+            pthread_cond_signal(&end_signal_mutex);
+            gameRunning = false;
+            pthread_mutex_unlock(&board_mutex);
+            pthread_mutex_unlock(&character_mutex);
+        }
+        else if (c == SPACE) {
+            pthread_create(&t2, NULL, (void *) &bullet, NULL);
+            pthread_mutex_unlock(&character_mutex);
+        }
+        else {
+            pthread_mutex_lock(&board_mutex);
+            consoleClearImage(characterRow,characterCol, CHARACTER_HEIGHT, strlen(characterTile[0]));
+            if (c == MOVE_LEFT) {
+                if (characterCol >= BOARD_LEFT_SIDE){
+                    pthread_mutex_lock(&character_position_mutex);
+                    characterCol-= 1;
+                    pthread_mutex_unlock(&character_position_mutex);
                 }
-
-                consoleDrawImage(characterRow, characterCol, characterTile, CHARACTER_HEIGHT);
-                
-
-                pthread_mutex_unlock(&board_mutex);
+            } else if (c == MOVE_RIGHT) {
+                if (characterCol <= BOARD_RIGHT_SIDE){
+                    pthread_mutex_lock(&character_position_mutex);
+                    characterCol+= 1;
+                    pthread_mutex_unlock(&character_position_mutex);
+                }
+            } else if (c == MOVE_DOWN) {
+                if (characterRow <= BOARD_BOTTOM){
+                    pthread_mutex_lock(&character_position_mutex);
+                    characterRow+= 1;
+                    pthread_mutex_unlock(&character_position_mutex);
+                }
+            } else if (c == MOVE_UP) {
+                if (characterRow >= BOARD_TOP){
+                    pthread_mutex_lock(&character_position_mutex);
+                    characterRow-= 1;
+                    pthread_mutex_unlock(&character_position_mutex);
+                }
+            } else if (c == 'e') {
+                pthread_create(&t2, NULL, (void *) &centipedeBullet, NULL);
             }
+
+            consoleDrawImage(characterRow, characterCol, characterTile, CHARACTER_HEIGHT);
+            
+
+            pthread_mutex_unlock(&board_mutex);
+            pthread_mutex_unlock(&character_mutex);
         }
     }
+    
 }
 
 void bullet() {
@@ -147,12 +161,12 @@ void bullet() {
     char* BULLET[1][1] = {{"|"}};
     char** bulletTile = BULLET[0];
     int bulletHeight = 0;
-    int hit = 0;
-    
+    int offScreen = 0;
+
     pthread_cond_wait(&fire_mutex_signal, &fire_mutex);  
     int bulletRow = characterRow;
     int bulletCol = characterCol;
-    while(!hit){
+    while(!hit && !offScreen){
         sleepTicks(15);
         if(bulletRow-bulletHeight != 2) {
             pthread_mutex_lock(&board_mutex);
@@ -169,16 +183,23 @@ void bullet() {
             consoleClearImage(bulletRow-bulletHeight, bulletCol, BULLET_HEIGHT, strlen(bulletTile[0]));
             
             pthread_mutex_unlock(&board_mutex);
-            hit = 1;
+            offScreen = 1;
         }
     }
+    
+    if(hit) {
+        pthread_mutex_lock(&board_mutex);
+        consoleClearImage(bulletRow-bulletHeight, bulletCol, BULLET_HEIGHT, strlen(bulletTile[0]));
+        pthread_mutex_unlock(&board_mutex);
+    }
+
     pthread_exit(&t2);
 }
 
 void fireRate() {
     while(true) {
         pthread_cond_signal(&fire_mutex_signal);
-        sleepTicks(30);
+        sleepTicks(50);
     }
 }
 
@@ -187,15 +208,17 @@ void centipedeBullet() {
     char* BULLET[1][1] = {{"."}};
     char** bulletTile = BULLET[0];
     int bulletHeight = 0;
-    int hit = 0;
+    int offScreen = 0;
     int bulletRow = 1;
     int bulletCol = 33;
-    
-    while(!hit){
+
+    while(!hit && !offScreen){
         sleepTicks(15);
         if (bulletRow-bulletHeight == characterRow && bulletCol == characterCol) {
-            
+            pthread_mutex_lock(&character_mutex);
+            hit = 1;
         }
+        
         else if(bulletRow-bulletHeight != 15) {
             pthread_mutex_lock(&board_mutex);
             if(bulletHeight <= 15 && bulletHeight != 0){
@@ -209,12 +232,17 @@ void centipedeBullet() {
         else {
             pthread_mutex_lock(&board_mutex);
             consoleClearImage(bulletRow-bulletHeight, bulletCol, BULLET_HEIGHT, strlen(bulletTile[0]));
-            
             pthread_mutex_unlock(&board_mutex);
-            hit = 1;
+            offScreen = 1;
         }
     }
     
+    if(hit) {
+        pthread_mutex_lock(&board_mutex);
+        consoleClearImage(bulletRow-bulletHeight, bulletCol, BULLET_HEIGHT, strlen(bulletTile[0]));
+        pthread_mutex_unlock(&board_mutex);
+    }
+
     pthread_exit(&t2);
 }
 
@@ -251,23 +279,58 @@ void upkeep() {
     char** lives1 = LIVES1[0];
     char* LIVES0[1][1] = {{"0"}};
     char** lives0 = LIVES0[0];
+    int lives = 3;
+    char* CHARACTER[1][1] = {{"@"}};
+    char** characterTile = CHARACTER[0];
+    char* CHARACTER_DEAD[1][1] = {{"*"}};
+    char** deadCharacterTile = CHARACTER_DEAD[0];
+
+
     pthread_mutex_lock(&board_mutex);
     consoleDrawImage(0, 41, lives3, 1);
     pthread_mutex_unlock(&board_mutex);
-    sleep(1);
-    pthread_mutex_lock(&board_mutex);
-    consoleClearImage(0, 41, 1, strlen(lives2[0]));
-    consoleDrawImage(0, 41, lives2, 1);
-    pthread_mutex_unlock(&board_mutex);
-    sleep(1);
-    pthread_mutex_lock(&board_mutex);
-    consoleClearImage(0, 41, 1, strlen(lives2[0]));
-    consoleDrawImage(0, 41, lives1, 1);
-    pthread_mutex_unlock(&board_mutex);
-    sleep(1);
-    pthread_mutex_lock(&board_mutex);
-    consoleClearImage(0, 41, 1, strlen(lives2[0]));
-    consoleDrawImage(0, 41, lives0, 1);
-    pthread_mutex_unlock(&board_mutex);
-    sleep(1);
+
+    while(!gameOver) {
+        sleepTicks(100);
+        if(hit && lives > 0) {
+            pthread_mutex_lock(&board_mutex);
+            consoleClearImage(0, 41, 1, strlen(lives3[0]));
+            if(lives == 3) {
+                consoleDrawImage(0, 41, lives2, 1);
+            }
+            if(lives == 2) {
+                consoleDrawImage(0, 41, lives1, 1);
+            }
+            if(lives == 1) {
+                consoleDrawImage(0, 41, lives0, 1);
+            }
+            consoleDrawImage(characterRow, characterCol, lives3, 1);
+            consoleRefresh();
+            sleep(1);
+            consoleDrawImage(characterRow, characterCol, lives2, 1);
+            consoleRefresh();
+            sleep(1);
+            consoleDrawImage(characterRow, characterCol, lives1, 1);
+            consoleRefresh();
+            sleep(1);
+            consoleClearImage(characterRow, characterCol, 1, strlen(lives3[0]));
+            consoleRefresh();
+            
+            pthread_mutex_lock(&character_position_mutex);
+            characterRow = BOARD_BOTTOM;
+            characterCol = BOARD_MIDDLE;
+            pthread_mutex_unlock(&character_position_mutex);
+            consoleDrawImage(characterRow, characterCol, characterTile, 1);
+            pthread_mutex_unlock(&board_mutex);
+            hit = 0;
+            pthread_mutex_unlock(&character_mutex);
+            lives--;
+        }
+
+        if(lives == 0) {
+            pthread_cond_signal(&end_signal_mutex);
+            gameOver = 1;
+        }
+    }
+    
 }
