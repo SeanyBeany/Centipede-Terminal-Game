@@ -6,7 +6,7 @@ DEBUG_FLAGS = -g
 
 LDLIBS = -lcurses -pthread
 
-OBJS = console.o centipede.o
+OBJS = main.o console.o centipede.o
 
 EXE = centipede
 
@@ -24,6 +24,9 @@ console.o: console.c console.h
 
 centipede.o: centipede.c
 	$(CC) $(CFLAGS) -c centipede.c
+
+main.o: main.c
+	$(CC) $(CFLAGS) -c main.c
 
 clean:
 	rm -f $(OBJS)

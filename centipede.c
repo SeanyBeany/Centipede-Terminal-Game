@@ -43,12 +43,14 @@ char *GAME_BOARD[] = {
 
 
 pthread_mutex_t board_mutex; // mutex for board
+pthread_mutex_t end_mutex; // mutex for ending program
+pthread_cond_t end_signal_mutex; // mutex for signal to end program
 pthread_t t1, t2, t3, t4, t5;
 int characterRow;
 int characterCol;
 int gameOver = 0;
 
-int main(int argc, char**argv) 
+void centipedeMain(int argc, char**argv) 
 {
     pthread_mutex_init(&board_mutex, NULL);
     if (consoleInit(GAME_ROWS, GAME_COLS, GAME_BOARD));
@@ -64,18 +66,16 @@ int main(int argc, char**argv)
     if (pthread_create(&t4, NULL, (void *) &upkeep, NULL) != 0){
         perror("pthread_create");
     }
-    while(true) {
-        if(gameOver == 1){
-            pthread_mutex_lock(&board_mutex);
-            finalKeypress();
-            consoleFinish();
-            pthread_mutex_unlock(&board_mutex);
-            if (pthread_join(t1, NULL) != 0) {
-                perror("pthread_join");
-            }
-            break;
-        }
+    
+    pthread_cond_wait(&end_signal_mutex, &end_mutex);
+    pthread_mutex_lock(&board_mutex);
+    finalKeypress();
+    consoleFinish();
+    pthread_mutex_unlock(&board_mutex);
+    if (pthread_join(t1, NULL) != 0) {
+        perror("pthread_join");
     }
+           
     return 0;
 }
 
@@ -95,7 +95,7 @@ void movePlayer() {
         if(gameRunning) {
             char c = getchar();
             if (c == QUIT) {
-                gameOver = true;
+                pthread_cond_signal(&end_signal_mutex);
                 gameRunning = false;
                 pthread_mutex_unlock(&board_mutex);
             }
@@ -121,8 +121,6 @@ void movePlayer() {
                     if (characterRow >= BOARD_TOP){
                         characterRow-= 1;
                     }
-                } else if (c == SPACE) {
-                    pthread_create(&t2, NULL, (void *) &bullet, NULL);
                 } else if (c == 'e') {
                     pthread_create(&t2, NULL, (void *) &centipedeBullet, NULL);
                 }

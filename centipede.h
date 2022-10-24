@@ -19,6 +19,7 @@
 #define BOARD_LEFT_SIDE 1
 #define BOARD_RIGHT_SIDE 78
 #define BOARD_MIDDLE 40
+void centipedeMain();
 void runCentipede();
 void movePlayer();
 void bullet();

@@ -4,6 +4,9 @@
         "stdlib.h": "c",
         "string.h": "c",
         "stdbool.h": "c",
-        "pthread.h": "c"
+        "pthread.h": "c",
+        "example.h": "c",
+        "centipede.h": "c",
+        "unistd.h": "c"
     }
 }
