@@ -28,5 +28,7 @@ void refresh();
 void keyboard();
 void upkeep();
 void fireRate();
+void setUpInput();
+void character();
 
 #endif

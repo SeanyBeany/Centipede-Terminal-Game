@@ -49,7 +49,7 @@ pthread_mutex_t character_mutex; // mutex for character
 pthread_mutex_t character_position_mutex; // mutex for character position
 pthread_cond_t end_signal_mutex; // mutex for signal to end program
 pthread_cond_t fire_mutex_signal; // mutex for signal to cap fire rate
-pthread_t t1, t2, t3, t4, t5, t6, t7;
+pthread_t t1, t2, t3, t4, t5, t6, t7, t8;
 int characterRow = BOARD_BOTTOM; // variable for character row position
 int characterCol = BOARD_MIDDLE; // variable for character column poisiton
 int gameOver = 0;
@@ -63,20 +63,22 @@ void centipedeMain(int argc, char**argv)
     pthread_mutex_init(&character_mutex, NULL);
     pthread_mutex_init(&character_position_mutex, NULL);
     if (consoleInit(GAME_ROWS, GAME_COLS, GAME_BOARD));
-    if (pthread_create(&t1, NULL, (void *) &movePlayer, NULL) != 0){
+    if (pthread_create(&t1, NULL, (void *) &keyboard, NULL) != 0){
         perror("pthread_create");
     }
     if (pthread_create(&t2, NULL, (void *) &refresh, NULL) != 0){
         perror("pthread_create");
     }
-    if (pthread_create(&t3, NULL, (void *) &keyboard, NULL) != 0){
+    if (pthread_create(&t3, NULL, (void *) &setUpInput, NULL) != 0){
         perror("pthread_create");
     }
     if (pthread_create(&t4, NULL, (void *) &upkeep, NULL) != 0){
         perror("pthread_create");
     }
-
     if (pthread_create(&t5, NULL, (void *) &fireRate, NULL) != 0){
+        perror("pthread_create");
+    }
+    if (pthread_create(&t8, NULL, (void *) &character, NULL) != 0){
         perror("pthread_create");
     }
     
@@ -92,7 +94,7 @@ void centipedeMain(int argc, char**argv)
     pthread_mutex_unlock(&board_mutex);
 }
 
-void movePlayer() {
+void keyboard() {
     char* CHARACTER[1][1] = {{"@"}};
     char** characterTile = CHARACTER[0];
 
@@ -199,6 +201,28 @@ void fireRate() {
     }
 }
 
+void character() {
+    char* CHARACTER_ANIMATION_A[1][1] = {{"@"}};
+    char** characterTile1 = CHARACTER_ANIMATION_A[0];
+    char* CHARACTER_ANIMATION_B[1][1] = {{"$"}};
+    char** characterTile2 = CHARACTER_ANIMATION_B[0];
+
+    while(!gameOver) {
+        sleepTicks(100);
+        pthread_mutex_lock(&character_mutex);
+        pthread_mutex_lock(&board_mutex);
+        consoleDrawImage(characterRow, characterCol, characterTile1, CHARACTER_HEIGHT);
+        pthread_mutex_unlock(&board_mutex);
+        pthread_mutex_unlock(&character_mutex);
+        sleepTicks(100);
+        pthread_mutex_lock(&character_mutex);
+        pthread_mutex_lock(&board_mutex);
+        consoleDrawImage(characterRow, characterCol, characterTile2, CHARACTER_HEIGHT);
+        pthread_mutex_unlock(&board_mutex);
+        pthread_mutex_unlock(&character_mutex);
+    }
+}
+
 void centipedeBullet() {
     char* BULLET[1][1] = {{"."}};
     char** bulletTile = BULLET[0];
@@ -239,7 +263,7 @@ void centipedeBullet() {
     }
 }
 
-void keyboard() {
+void setUpInput() {
     fd_set set; // what to check for our select call
     int ret;
     while(!gameOver) { // set up the keyboard input
