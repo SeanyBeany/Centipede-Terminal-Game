@@ -5,4 +5,5 @@ int main(int argc, char**argv)
 {
 	centipedeMain();
 	printf("done!\n");
+	return 0;
 }

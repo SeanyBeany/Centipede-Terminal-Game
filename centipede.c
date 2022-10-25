@@ -49,7 +49,7 @@ pthread_mutex_t character_mutex; // mutex for character
 pthread_mutex_t character_position_mutex; // mutex for character position
 pthread_cond_t end_signal_mutex; // mutex for signal to end program
 pthread_cond_t fire_mutex_signal; // mutex for signal to cap fire rate
-pthread_t t1, t2, t3, t4, t5;
+pthread_t t1, t2, t3, t4, t5, t6, t7;
 int characterRow = BOARD_BOTTOM; // variable for character row position
 int characterCol = BOARD_MIDDLE; // variable for character column poisiton
 int gameOver = 0;
@@ -66,10 +66,10 @@ void centipedeMain(int argc, char**argv)
     if (pthread_create(&t1, NULL, (void *) &movePlayer, NULL) != 0){
         perror("pthread_create");
     }
-    if (pthread_create(&t3, NULL, (void *) &refresh, NULL) != 0){
+    if (pthread_create(&t2, NULL, (void *) &refresh, NULL) != 0){
         perror("pthread_create");
     }
-    if (pthread_create(&t4, NULL, (void *) &keyboard, NULL) != 0){
+    if (pthread_create(&t3, NULL, (void *) &keyboard, NULL) != 0){
         perror("pthread_create");
     }
     if (pthread_create(&t4, NULL, (void *) &upkeep, NULL) != 0){
@@ -82,18 +82,17 @@ void centipedeMain(int argc, char**argv)
     
     pthread_cond_wait(&end_signal_mutex, &end_mutex);
     pthread_mutex_lock(&board_mutex);
-    finalKeypress();
+    pthread_mutex_lock(&character_mutex);
+    pthread_mutex_lock(&character_position_mutex);
     consoleFinish();
-    pthread_mutex_unlock(&board_mutex);
     if (pthread_join(t1, NULL) != 0) {
         perror("pthread_join");
     }
-           
-    return 0;
+    
+    pthread_mutex_unlock(&board_mutex);
 }
 
 void movePlayer() {
-    bool gameRunning = true;
     char* CHARACTER[1][1] = {{"@"}};
     char** characterTile = CHARACTER[0];
 
@@ -102,17 +101,17 @@ void movePlayer() {
     
     pthread_mutex_unlock(&board_mutex);
 
-    while(gameRunning){
+    while(!gameOver){
         char c = getchar();
         pthread_mutex_lock(&character_mutex);
         if (c == QUIT) {
+            gameOver = true;
             pthread_cond_signal(&end_signal_mutex);
-            gameRunning = false;
             pthread_mutex_unlock(&board_mutex);
             pthread_mutex_unlock(&character_mutex);
         }
         else if (c == SPACE) {
-            pthread_create(&t2, NULL, (void *) &bullet, NULL);
+            pthread_create(&t6, NULL, (void *) &bullet, NULL);
             pthread_mutex_unlock(&character_mutex);
         }
         else {
@@ -143,7 +142,7 @@ void movePlayer() {
                     pthread_mutex_unlock(&character_position_mutex);
                 }
             } else if (c == 'e') {
-                pthread_create(&t2, NULL, (void *) &centipedeBullet, NULL);
+                pthread_create(&t7, NULL, (void *) &centipedeBullet, NULL);
             }
 
             consoleDrawImage(characterRow, characterCol, characterTile, CHARACTER_HEIGHT);
@@ -153,11 +152,9 @@ void movePlayer() {
             pthread_mutex_unlock(&character_mutex);
         }
     }
-    
 }
 
 void bullet() {
-    bool gameRunning = true;
     char* BULLET[1][1] = {{"|"}};
     char** bulletTile = BULLET[0];
     int bulletHeight = 0;
@@ -193,18 +190,16 @@ void bullet() {
         pthread_mutex_unlock(&board_mutex);
     }
 
-    pthread_exit(&t2);
 }
 
 void fireRate() {
-    while(true) {
+    while(!gameOver) {
         pthread_cond_signal(&fire_mutex_signal);
         sleepTicks(50);
     }
 }
 
 void centipedeBullet() {
-    bool gameRunning = true;
     char* BULLET[1][1] = {{"."}};
     char** bulletTile = BULLET[0];
     int bulletHeight = 0;
@@ -242,30 +237,31 @@ void centipedeBullet() {
         consoleClearImage(bulletRow-bulletHeight, bulletCol, BULLET_HEIGHT, strlen(bulletTile[0]));
         pthread_mutex_unlock(&board_mutex);
     }
-
-    pthread_exit(&t2);
 }
 
 void keyboard() {
     fd_set set; // what to check for our select call
     int ret;
-    FD_ZERO(&set);
-    FD_SET(STDIN_FILENO, &set);
-    struct timespec timeout = getTimeout(1); /* duration of one tick */
-    ret = select(FD_SETSIZE, &set, NULL, NULL, &timeout);	
-    if (ret == 0) {
-    printf("ret = %d\n", ret);
-    printf(" timeout\n");
+    while(!gameOver) { // set up the keyboard input
+        FD_ZERO(&set);
+        FD_SET(STDIN_FILENO, &set);
+        struct timespec timeout = getTimeout(1); /* duration of one tick */
+        ret = select(FD_SETSIZE, &set, NULL, NULL, &timeout);	
+        if (ret == -1) {
+            printf("Failed to select");
+        }
+        sleepTicks(20);
+        
     }
-    pthread_exit(&t4);
 }
 
 void refresh() {
-    while(true) {
+    while(!gameOver) {
         sleepTicks(1);
-        pthread_mutex_lock(&board_mutex);
-        consoleRefresh();
-        pthread_mutex_unlock(&board_mutex);
+        if(pthread_mutex_trylock(&board_mutex) == 0) {
+            consoleRefresh();
+            pthread_mutex_unlock(&board_mutex);
+        }
     }
 }
 
@@ -282,9 +278,6 @@ void upkeep() {
     int lives = 3;
     char* CHARACTER[1][1] = {{"@"}};
     char** characterTile = CHARACTER[0];
-    char* CHARACTER_DEAD[1][1] = {{"*"}};
-    char** deadCharacterTile = CHARACTER_DEAD[0];
-
 
     pthread_mutex_lock(&board_mutex);
     consoleDrawImage(0, 41, lives3, 1);
@@ -332,5 +325,4 @@ void upkeep() {
             gameOver = 1;
         }
     }
-    
 }
