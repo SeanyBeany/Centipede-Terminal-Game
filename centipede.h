@@ -19,6 +19,11 @@
 #define BOARD_LEFT_SIDE 1
 #define BOARD_RIGHT_SIDE 78
 #define BOARD_MIDDLE 40
+#define ENEMY_HEIGHT 2
+#define ENEMY_BODY_ANIM_TILES 8 
+#define QUIT_BODY 36
+#define QUIT_HEIGHT 2
+
 void centipedeMain();
 void runCentipede();
 void movePlayer();
@@ -30,5 +35,5 @@ void upkeep();
 void fireRate();
 void setUpInput();
 void character();
-
+void centipedeSpawner();
 #endif

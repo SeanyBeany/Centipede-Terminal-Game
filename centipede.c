@@ -41,6 +41,65 @@ char *GAME_BOARD[] = {
 "", 
 "" };
 
+char* ENEMY_BODY[ENEMY_BODY_ANIM_TILES][ENEMY_HEIGHT] = 
+{
+  {"1",
+   "1"},
+  {"2",
+   "2"},
+  {"3",
+   "3"},
+  {"4",
+   "4"},
+  {"5",
+   "5"},
+  {"6",
+   "6"},
+  {"7",
+   "7"},
+  {"8",
+   "8"}
+};
+
+char* QUIT_TEXT[QUIT_BODY][QUIT_HEIGHT] =
+{
+    {"p"},
+    {"r"},
+    {"e"},
+    {"s"},
+    {"s"},
+    {" "},
+    {"a"},
+    {"n"},
+    {"y"},
+    {" "},
+    {"b"},
+    {"u"},
+    {"t"},
+    {"t"},
+    {"o"},
+    {"n"},
+    {" "},
+    {"t"},
+    {"o"},
+    {" "},
+    {"e"},
+    {"x"},
+    {"i"},
+    {"t"},
+    {" "},
+    {"t"},
+    {"h"},
+    {"e"},
+    {" "},
+    {"p"},
+    {"r"},
+    {"o"},
+    {"g"},
+    {"r"},
+    {"a"},
+    {"m"}
+};
 
 pthread_mutex_t board_mutex; // mutex for board
 pthread_mutex_t end_mutex; // mutex for ending program
@@ -49,7 +108,7 @@ pthread_mutex_t character_mutex; // mutex for character
 pthread_mutex_t character_position_mutex; // mutex for character position
 pthread_cond_t end_signal_mutex; // mutex for signal to end program
 pthread_cond_t fire_mutex_signal; // mutex for signal to cap fire rate
-pthread_t t1, t2, t3, t4, t5, t6, t7, t8;
+pthread_t t1, t2, t3, t4, t5, t6, t7, t8, t9;
 int characterRow = BOARD_BOTTOM; // variable for character row position
 int characterCol = BOARD_MIDDLE; // variable for character column poisiton
 int gameOver = 0;
@@ -78,19 +137,21 @@ void centipedeMain(int argc, char**argv)
     if (pthread_create(&t5, NULL, (void *) &fireRate, NULL) != 0){
         perror("pthread_create");
     }
-    if (pthread_create(&t8, NULL, (void *) &character, NULL) != 0){
+    if (pthread_create(&t6, NULL, (void *) &character, NULL) != 0){
+        perror("pthread_create");
+    }
+    if (pthread_create(&t9, NULL, (void *) &centipedeSpawner, NULL) != 0){
         perror("pthread_create");
     }
     
     pthread_cond_wait(&end_signal_mutex, &end_mutex);
-    pthread_mutex_lock(&board_mutex);
-    pthread_mutex_lock(&character_mutex);
-    pthread_mutex_lock(&character_position_mutex);
-    consoleFinish();
-    if (pthread_join(t1, NULL) != 0) {
-        perror("pthread_join");
-    }
+    sleepTicks(10);
+    pthread_join(t2, NULL);
     
+    
+    pthread_mutex_lock(&board_mutex);
+    finalKeypress();
+    consoleFinish();
     pthread_mutex_unlock(&board_mutex);
 }
 
@@ -100,7 +161,6 @@ void keyboard() {
 
     pthread_mutex_lock(&board_mutex);
     consoleDrawImage(characterRow, characterCol, characterTile, 1);
-    
     pthread_mutex_unlock(&board_mutex);
 
     while(!gameOver){
@@ -108,12 +168,15 @@ void keyboard() {
         pthread_mutex_lock(&character_mutex);
         if (c == QUIT) {
             gameOver = true;
+            for(int i = 0; i<QUIT_BODY; i++) {
+                char** tile = QUIT_TEXT[i];
+                consoleDrawImage(10, 23+i, tile, CHARACTER_HEIGHT);
+            }
             pthread_cond_signal(&end_signal_mutex);
-            pthread_mutex_unlock(&board_mutex);
             pthread_mutex_unlock(&character_mutex);
         }
         else if (c == SPACE) {
-            pthread_create(&t6, NULL, (void *) &bullet, NULL);
+            pthread_create(&t7, NULL, (void *) &bullet, NULL);
             pthread_mutex_unlock(&character_mutex);
         }
         else {
@@ -144,7 +207,7 @@ void keyboard() {
                     pthread_mutex_unlock(&character_position_mutex);
                 }
             } else if (c == 'e') {
-                pthread_create(&t7, NULL, (void *) &centipedeBullet, NULL);
+                pthread_create(&t8, NULL, (void *) &centipedeBullet, NULL);
             }
 
             consoleDrawImage(characterRow, characterCol, characterTile, CHARACTER_HEIGHT);
@@ -349,4 +412,9 @@ void upkeep() {
             gameOver = 1;
         }
     }
+}
+
+void centipedeSpawner() {
+    pthread_t centipede[20];
+    
 }
