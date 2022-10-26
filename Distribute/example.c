@@ -15,7 +15,7 @@
 
 #define GAME_ROWS 24
 #define GAME_COLS 80
-
+pthread_mutex_t board;
 /**** DIMENSIONS MUST MATCH the ROWS/COLS */
 char *GAME_BOARD[] = {
 "                   Score:          Lives:",
@@ -44,26 +44,48 @@ char *GAME_BOARD[] = {
 "" };
 
 
-#define ENEMY_HEIGHT 2
-#define ENEMY_BODY_ANIM_TILES 8 
+#define ENEMY_HEIGHT 1
+#define ENEMY_BODY_ANIM_TILES 36
 char* ENEMY_BODY[ENEMY_BODY_ANIM_TILES][ENEMY_HEIGHT] = 
 {
-  {"1",
-   "1"},
-  {"2",
-   "2"},
-  {"3",
-   "3"},
-  {"4",
-   "4"},
-  {"5",
-   "5"},
-  {"6",
-   "6"},
-  {"7",
-   "7"},
-  {"8",
-   "8"}
+  
+    {"p"},
+    {"r"},
+    {"e"},
+    {"s"},
+    {"s"},
+    {" "},
+    {"a"},
+    {"n"},
+    {"y"},
+    {" "},
+    {"b"},
+    {"u"},
+    {"t"},
+    {"t"},
+    {"o"},
+    {"n"},
+    {" "},
+    {"t"},
+    {"o"},
+    {" "},
+    {"e"},
+    {"x"},
+    {"i"},
+    {"t"},
+    {" "},
+    {"t"},
+    {"h"},
+    {"e"},
+    {" "},
+    {"p"},
+    {"r"},
+    {"o"},
+    {"g"},
+    {"r"},
+    {"a"},
+    {"m"}
+  
 };
 
 
@@ -73,10 +95,10 @@ void exampleRun()
   {
     //only run one example at once (comment others out).
     //these examples should be removed in your final submission!
-
-    moveEnemyExample();
+    pthread_mutex_init(&board, NULL);
+    //moveEnemyExample();
     //playerControlExample(); 
-    //multipleEnemyExample();
+    multipleEnemyExample();
 				
     finalKeypress(); /* wait for final key before killing curses and game */
   }       
@@ -92,11 +114,12 @@ void moveEnemyExample(int row, int col)
                                                 //this "animation" is just the body changing appearance (changing numbers)
   {
     char** tile = ENEMY_BODY[i];
-
-    consoleClearImage(row,col+i-1,ENEMY_HEIGHT, strlen(tile[0])); //clear the last drawing (why is this necessary?)
+    pthread_mutex_lock(&board);
+    
     consoleDrawImage(row, col+i, tile, ENEMY_HEIGHT); //draw the enemy at 10,10 but move them along once per animation image
     consoleRefresh(); //reset the state of the console drawing tool
-    sleep(1); //give up our turn on the CPU
+    pthread_mutex_unlock(&board);
+    sleepTicks(5); //give up our turn on the CPU
   }
 }
 
@@ -175,10 +198,10 @@ void multipleEnemyExample()
 {
 
   pthread_t enemy1, enemy2;
-  int pos1[] = {10,10};
-  int pos2[] = {10,20};
+  int pos1[] = {2,0};
+  //int pos2[] = {11,20};
   pthread_create(&enemy1, NULL, moveEnemyExampleT, (void*)pos1);
-  pthread_create(&enemy2, NULL, moveEnemyExampleT, (void*)pos2);
+  //pthread_create(&enemy2, NULL, moveEnemyExampleT, (void*)pos2);
 
   pthread_join(enemy1, NULL);
   pthread_join(enemy2, NULL);

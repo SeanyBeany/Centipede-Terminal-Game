@@ -22,7 +22,7 @@
 #define ENEMY_HEIGHT 2
 #define ENEMY_BODY_ANIM_TILES 8 
 #define QUIT_BODY 36
-#define QUIT_HEIGHT 2
+#define QUIT_HEIGHT 1
 
 void centipedeMain();
 void runCentipede();
