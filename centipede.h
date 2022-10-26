@@ -19,7 +19,7 @@
 #define BOARD_LEFT_SIDE 1
 #define BOARD_RIGHT_SIDE 78
 #define BOARD_MIDDLE 40
-#define ENEMY_HEIGHT 2
+#define ENEMY_HEIGHT 1
 #define ENEMY_BODY_ANIM_TILES 8 
 #define QUIT_BODY 36
 #define QUIT_HEIGHT 1
@@ -28,12 +28,17 @@ void centipedeMain();
 void runCentipede();
 void movePlayer();
 void bullet();
-void centipedeBullet();
+void centipedeBullet(int bulletRow, int bulletCol);
 void refresh();
 void keyboard();
 void upkeep();
 void fireRate();
 void setUpInput();
 void character();
+void centipede(int row, int col);
+void* bulletLocation(void *v);
+void* centipedeLocation(void *v);
 void centipedeSpawner();
+
+
 #endif

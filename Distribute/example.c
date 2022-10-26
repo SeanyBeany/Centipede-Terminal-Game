@@ -45,49 +45,34 @@ char *GAME_BOARD[] = {
 
 
 #define ENEMY_HEIGHT 1
-#define ENEMY_BODY_ANIM_TILES 36
+#define ENEMY_BODY_ANIM_TILES 8
 char* ENEMY_BODY[ENEMY_BODY_ANIM_TILES][ENEMY_HEIGHT] = 
 {
   
-    {"p"},
-    {"r"},
-    {"e"},
-    {"s"},
-    {"s"},
-    {" "},
-    {"a"},
-    {"n"},
-    {"y"},
-    {" "},
-    {"b"},
-    {"u"},
-    {"t"},
-    {"t"},
-    {"o"},
-    {"n"},
-    {" "},
-    {"t"},
-    {"o"},
-    {" "},
-    {"e"},
-    {"x"},
-    {"i"},
-    {"t"},
-    {" "},
-    {"t"},
-    {"h"},
-    {"e"},
-    {" "},
-    {"p"},
-    {"r"},
-    {"o"},
-    {"g"},
-    {"r"},
-    {"a"},
-    {"m"}
+    {"1"},
+    {"2"},
+    {"3"},
+    {"4"},
+    {"5"},
+    {"6"},
+    {"7"},
+    {"8"}
   
 };
 
+char* ENEMY_BODY2[ENEMY_BODY_ANIM_TILES][ENEMY_HEIGHT] = 
+{
+  
+    {"<"},
+    {"-"},
+    {"-"},
+    {"-"},
+    {"-"},
+    {"-"},
+    {"-"},
+    {">"}
+  
+};
 
 void exampleRun()
 {
@@ -108,21 +93,80 @@ void exampleRun()
 
 //no threading...just an example of drawing to the console
 //and an example of how animation works...just drawing a picture one at a time...fast!
-void moveEnemyExample(int row, int col)
-{
-  for (int i = 0; i<ENEMY_BODY_ANIM_TILES; i++) //loop over the whole enemy animation once
-                                                //this "animation" is just the body changing appearance (changing numbers)
-  {
-    char** tile = ENEMY_BODY[i];
+void moveEnemyExample(int row, int col) { 
+  int j = -7;
+  int flip = false;
+  char** tile;
+  int changeAnimation = false;
+  int flipValue = 0;
+  while(true){
+
+    if(col+j >= 72){
+      flip = true;
+      pthread_mutex_lock(&board);
+      consoleClearImage(row, j, 1, 8);
+      consoleRefresh(); //reset the state of the console drawing tool
+      pthread_mutex_unlock(&board);
+      row++;
+    }
+
+    if(col+j <= 1 && flip == true) {
+      flip = false;
+      pthread_mutex_lock(&board);
+      consoleClearImage(row, j, 1, 8);
+      consoleRefresh(); //reset the state of the console drawing tool
+      pthread_mutex_unlock(&board);
+      row++;
+    }
+
+    if(flip){
+      j--;
+    }
+    else {
+      j++;
+    }
+
     pthread_mutex_lock(&board);
-    
-    consoleDrawImage(row, col+i, tile, ENEMY_HEIGHT); //draw the enemy at 10,10 but move them along once per animation image
+    consoleClearImage(row, j+col-1, 1, 1);
+    consoleClearImage(row, j+8, 1, 1);
     consoleRefresh(); //reset the state of the console drawing tool
     pthread_mutex_unlock(&board);
-    sleepTicks(5); //give up our turn on the CPU
+    for (int i = 0; i<ENEMY_BODY_ANIM_TILES; i++) { //loop over the whole enemy animation once 
+      if(changeAnimation) {
+        if(flip == false) {
+          tile = ENEMY_BODY[i];
+        }
+        else {
+          tile = ENEMY_BODY[7-i];
+        }
+      }
+      else {
+        if(flip == false) {
+          tile = ENEMY_BODY2[i];
+        }
+        else {
+          tile = ENEMY_BODY2[7-i];
+        }
+      }
+      pthread_mutex_lock(&board);
+      if(flip == true) {
+          consoleDrawImage(row, col+i+j, tile, ENEMY_HEIGHT);
+      }
+      else {
+          consoleDrawImage(row, col+i+j, tile, ENEMY_HEIGHT);
+      }
+      consoleRefresh(); //reset the state of the console drawing tool
+      pthread_mutex_unlock(&board);
+    }
+    sleepTicks(1);
+    if(changeAnimation) {
+      changeAnimation = false;
+    }
+    else {
+      changeAnimation = true;
+    }
   }
 }
-
 void playerControlExample()
 {
   fd_set set; /* what to check for our select call */
@@ -204,6 +248,6 @@ void multipleEnemyExample()
   //pthread_create(&enemy2, NULL, moveEnemyExampleT, (void*)pos2);
 
   pthread_join(enemy1, NULL);
-  pthread_join(enemy2, NULL);
+  //pthread_join(enemy2, NULL);
 }
 

@@ -1,0 +1,12 @@
+#arraylist of threads
+#use arraylist of threads in main program
+#join all threads and quit cleanly
+#caterpillar wraps properly on walls
+#add caterpillar to main program
+#make caterpillar shoot bullets
+#make caterpillar break into threads which die and disappear when size 1
+#add 100 score when caterpillars break into threads
+#win when you get 4000 score
+#lose when you get 0 lives
+#join all threads and quit cleanly
+DONE

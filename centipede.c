@@ -43,22 +43,28 @@ char *GAME_BOARD[] = {
 
 char* ENEMY_BODY[ENEMY_BODY_ANIM_TILES][ENEMY_HEIGHT] = 
 {
-  {"1",
-   "1"},
-  {"2",
-   "2"},
-  {"3",
-   "3"},
-  {"4",
-   "4"},
-  {"5",
-   "5"},
-  {"6",
-   "6"},
-  {"7",
-   "7"},
-  {"8",
-   "8"}
+    {"-"},
+    {"~"},
+    {"-"},
+    {"~"},
+    {"-"},
+    {"~"},
+    {"-"},
+    {"~"}
+};
+
+char* ENEMY_BODY2[ENEMY_BODY_ANIM_TILES][ENEMY_HEIGHT] = 
+{
+  
+    {"~"},
+    {"-"},
+    {"~"},
+    {"-"},
+    {"~"},
+    {"-"},
+    {"~"},
+    {"-"}
+  
 };
 
 char* QUIT_TEXT[QUIT_BODY][QUIT_HEIGHT] =
@@ -83,8 +89,8 @@ char* QUIT_TEXT[QUIT_BODY][QUIT_HEIGHT] =
     {"t"},
     {"o"},
     {" "},
-    {"e"},
-    {"x"},
+    {"q"},
+    {"u"},
     {"i"},
     {"t"},
     {" "},
@@ -212,9 +218,7 @@ void keyboard() {
                     characterRow-= 1;
                     pthread_mutex_unlock(&character_position_mutex);
                 }
-            } else if (c == 'e') {
-                pthread_create(&t8, NULL, (void *) &centipedeBullet, NULL);
-            }
+            } 
 
             consoleDrawImage(characterRow, characterCol, characterTile, CHARACTER_HEIGHT);
             pthread_mutex_unlock(&board_mutex);
@@ -289,13 +293,11 @@ void character() {
     }
 }
 
-void centipedeBullet() {
+void centipedeBullet(int bulletRow, int bulletCol) {
     char* BULLET[1][1] = {{"."}};
     char** bulletTile = BULLET[0];
     int bulletHeight = 0;
     int offScreen = 0;
-    int bulletRow = 1;
-    int bulletCol = 33;
 
     while(!hit && !offScreen){
         sleepTicks(15);
@@ -422,7 +424,125 @@ void upkeep() {
     }
 }
 
-void centipedeSpawner() {
-    pthread_t centipede[20];
+void centipede(int row, int col) { 
+  int j = -7;
+  int flip = false;
+  char** tile;
+  int changeAnimation = false;
+  int flipValue = 0;
+  int loopsBeforeBullet = 20;
+  int pos1[2];
+  while(!gameOver){
 
+    if(col+j >= 72){
+      flip = true;
+      pthread_mutex_lock(&board_mutex);
+      consoleClearImage(row, j, 1, 8);
+      consoleRefresh(); //reset the state of the console drawing tool
+      pthread_mutex_unlock(&board_mutex);
+      row++;
+    }
+
+    if(col+j <= 1 && flip == true) {
+      flip = false;
+      pthread_mutex_lock(&board_mutex);
+      consoleClearImage(row, j, 1, 8);
+      consoleRefresh(); //reset the state of the console drawing tool
+      pthread_mutex_unlock(&board_mutex);
+      row++;
+    }
+
+    if(flip){
+      j--;
+    }
+    else {
+      j++;
+    }
+
+    pthread_mutex_lock(&board_mutex);
+    consoleClearImage(row, j+col-1, 1, 1);
+    consoleClearImage(row, j+8, 1, 1);
+    consoleRefresh(); //reset the state of the console drawing tool
+    pthread_mutex_unlock(&board_mutex);
+    for (int i = 0; i<ENEMY_BODY_ANIM_TILES; i++) { //loop over the whole enemy animation once 
+      if(changeAnimation) {
+        if(flip == false) {
+          tile = ENEMY_BODY[i];
+        }
+        else {
+          tile = ENEMY_BODY[7-i];
+        }
+      }
+      else {
+        if(flip == false) {
+          tile = ENEMY_BODY2[i];
+        }
+        else {
+          tile = ENEMY_BODY2[7-i];
+        }
+      }
+      pthread_mutex_lock(&board_mutex);
+      if(flip == true) {
+          consoleDrawImage(row, col+i+j, tile, ENEMY_HEIGHT);
+      }
+      else {
+          consoleDrawImage(row, col+i+j, tile, ENEMY_HEIGHT);
+      }
+      consoleRefresh(); //reset the state of the console drawing tool
+      pthread_mutex_unlock(&board_mutex);
+    }
+    sleepTicks(10);
+    if(loopsBeforeBullet == 0) { 
+        if(flip) {
+            pos1[0] = row+1;
+            pos1[1] = col+j+5;
+        }
+        else {
+            pos1[0] = row+1;
+            pos1[1] = col+j+1;
+        }
+        pthread_create(&t8, NULL, (void *) &bulletLocation, (void*) pos1);
+        loopsBeforeBullet = 20;
+    }
+    else {
+        loopsBeforeBullet--;
+    }
+
+    if(changeAnimation) {
+      changeAnimation = false;
+    }
+    else {
+      changeAnimation = true;
+    }
+  }
+}
+
+void* bulletLocation(void *v)
+{
+  int* pos = (int*)v;
+  centipedeBullet(pos[0], pos[1]);
+
+  return NULL;
+}
+
+void* centipedeLocation(void *v)
+{
+  int* pos = (int*)v;
+  centipede(pos[0], pos[1]);
+
+  return NULL;
+}
+
+void centipedeSpawner()
+{
+
+  pthread_t enemy1, enemy2;
+  int pos1[] = {2,0};
+  int pos2[] = {2,0};
+  pthread_create(&enemy1, NULL, centipedeLocation, (void*)pos1);
+  sleep(1000);
+  pthread_create(&enemy2, NULL, centipedeLocation, (void*)pos2);
+
+  pthread_join(enemy1, NULL);
+  pthread_join(enemy2, NULL);
 }
