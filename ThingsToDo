@@ -1,4 +1,3 @@
-#arraylist of threads
 #use arraylist of threads in main program
 #join all threads and quit cleanly
 #caterpillar wraps properly on walls
