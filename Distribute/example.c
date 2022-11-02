@@ -188,9 +188,9 @@ void playerControlExample()
     //read man page for pselect to understand all of this!
     FD_ZERO(&set);
     FD_SET(STDIN_FILENO, &set);
-    struct timespec timeout = getTimeout(1); /* duration of one tick */
+    struct timespec timeout = getTimeout(100); /* duration of one tick */
     int ret = pselect(FD_SETSIZE, &set, NULL, NULL, &timeout, NULL);		
-
+    fflush(stdin); //Clear stdin so character movement isn't buffered
 
     /* check if we timed out, or, event happened.
       also, game may have ended while we waited */

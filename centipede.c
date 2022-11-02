@@ -2,6 +2,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/select.h>
 #include <stdlib.h>
@@ -98,9 +99,6 @@ void centipedeMain(int argc, char**argv)
     if (pthread_create(&t2, NULL, (void *) &refresh, NULL) != 0){
         perror("pthread_create");
     }
-    if (pthread_create(&t3, NULL, (void *) &setUpInput, NULL) != 0){
-        perror("pthread_create");
-    }
     if (pthread_create(&t4, NULL, (void *) &upkeep, NULL) != 0){
         perror("pthread_create");
     }
@@ -140,56 +138,68 @@ void keyboard() {
     pthread_mutex_unlock(&board_mutex);
 
     while(!gameOver){
-        char c = getchar();
-        pthread_mutex_lock(&character_mutex);
-        if (c == QUIT) {
-            gameOver = true;
-            for(int i = 0; i<QUIT_BODY; i++) {
-                char* s = "Press any button to quit the game";
-                int stringLength = 33;
-                pthread_mutex_lock(&board_mutex);
-                putString(s, MIDDLE_COLUMN, BOARD_MIDDLE-(stringLength/2), stringLength); //Put string "Game Over" in middle of screen
-                pthread_mutex_unlock(&board_mutex);
+        fd_set set; // what to check for our select call
+        int ret;
+        FD_ZERO(&set);
+        FD_SET(STDIN_FILENO, &set);
+        struct timeval timeout = getTimeouts(1); // duration of one tick
+        ret = select(FD_SETSIZE, &set, NULL, NULL, &timeout);	
+        if(ret == -1) {
+            perror("Error with select:");
+        }
+        
+        if(!gameOver && ret >= 1){
+            char c = getchar();
+            pthread_mutex_lock(&character_mutex);
+            if (c == QUIT) {
+                gameOver = true;
+                for(int i = 0; i<QUIT_BODY; i++) {
+                    char* s = "Press any button to quit the game";
+                    int stringLength = 33;
+                    pthread_mutex_lock(&board_mutex);
+                    putString(s, MIDDLE_COLUMN, BOARD_MIDDLE-(stringLength/2), stringLength); //Put string "Game Over" in middle of screen
+                    pthread_mutex_unlock(&board_mutex);
+                }
+                pthread_cond_signal(&end_signal);
+                pthread_mutex_unlock(&character_mutex);
             }
-            pthread_cond_signal(&end_signal);
-            pthread_mutex_unlock(&character_mutex);
-        }
-        else if (c == SPACE) {
-            pthread_create(&t7, NULL, (void *) &bullet, NULL);
-            pthread_mutex_unlock(&character_mutex);
-        }
-        else {
-            pthread_mutex_lock(&board_mutex);
-            consoleClearImage(characterRow,characterCol, CHARACTER_HEIGHT, strlen(characterTile[0]));
-            if (c == MOVE_LEFT) {
-                if (characterCol >= BOARD_LEFT_SIDE){
-                    pthread_mutex_lock(&character_position_mutex);
-                    characterCol-= 1;
-                    pthread_mutex_unlock(&character_position_mutex);
-                }
-            } else if (c == MOVE_RIGHT) {
-                if (characterCol <= BOARD_RIGHT_SIDE){
-                    pthread_mutex_lock(&character_position_mutex);
-                    characterCol+= 1;
-                    pthread_mutex_unlock(&character_position_mutex);
-                }
-            } else if (c == MOVE_DOWN) {
-                if (characterRow <= BOARD_BOTTOM){
-                    pthread_mutex_lock(&character_position_mutex);
-                    characterRow+= 1;
-                    pthread_mutex_unlock(&character_position_mutex);
-                }
-            } else if (c == MOVE_UP) {
-                if (characterRow >= BOARD_TOP){
-                    pthread_mutex_lock(&character_position_mutex);
-                    characterRow-= 1;
-                    pthread_mutex_unlock(&character_position_mutex);
-                }
-            } 
+            else if (c == SPACE) {
+                pthread_create(&t7, NULL, (void *) &bullet, NULL);
+                pthread_mutex_unlock(&character_mutex);
+            }
+            else {
+                pthread_mutex_lock(&board_mutex);
+                consoleClearImage(characterRow,characterCol, CHARACTER_HEIGHT, strlen(characterTile[0]));
+                if (c == MOVE_LEFT) {
+                    if (characterCol >= BOARD_LEFT_SIDE){
+                        pthread_mutex_lock(&character_position_mutex);
+                        characterCol-= 1;
+                        pthread_mutex_unlock(&character_position_mutex);
+                    }
+                } else if (c == MOVE_RIGHT) {
+                    if (characterCol <= BOARD_RIGHT_SIDE){
+                        pthread_mutex_lock(&character_position_mutex);
+                        characterCol+= 1;
+                        pthread_mutex_unlock(&character_position_mutex);
+                    }
+                } else if (c == MOVE_DOWN) {
+                    if (characterRow <= BOARD_BOTTOM){
+                        pthread_mutex_lock(&character_position_mutex);
+                        characterRow+= 1;
+                        pthread_mutex_unlock(&character_position_mutex);
+                    }
+                } else if (c == MOVE_UP) {
+                    if (characterRow >= BOARD_TOP){
+                        pthread_mutex_lock(&character_position_mutex);
+                        characterRow-= 1;
+                        pthread_mutex_unlock(&character_position_mutex);
+                    }
+                } 
 
-            consoleDrawImage(characterRow, characterCol, characterTile, CHARACTER_HEIGHT);
-            pthread_mutex_unlock(&board_mutex);
-            pthread_mutex_unlock(&character_mutex);
+                consoleDrawImage(characterRow, characterCol, characterTile, CHARACTER_HEIGHT);
+                pthread_mutex_unlock(&board_mutex);
+                pthread_mutex_unlock(&character_mutex);
+            }
         }
     }
 }
@@ -298,22 +308,6 @@ void centipedeBullet(int bulletRow, int bulletCol) {
     }
 }
 
-void setUpInput() {
-    fd_set set; // what to check for our select call
-    int ret;
-    while(!gameOver) { // set up the keyboard input
-        FD_ZERO(&set);
-        FD_SET(STDIN_FILENO, &set);
-        struct timespec timeout = getTimeout(1); /* duration of one tick */
-        ret = select(FD_SETSIZE, &set, NULL, NULL, &timeout);	
-        if (ret == -1) {
-            printf("Failed to select");
-        }
-        sleepTicks(20);
-        
-    }
-}
-
 void refresh() {
     while(!gameOver) {
         sleepTicks(1);
@@ -417,13 +411,12 @@ void centipede(int row, int col) {
   int flip = false;
   char** tile;
   int changeAnimation = false;
-  int flipValue = 0;
   int loopsBeforeBullet = 10;
   int pos1[2];
   int tickSpeed = 20; //Speed of ticks between animations
   while(!gameOver){
     pthread_mutex_lock(&character_mutex); //If character gets hit pause the animation
-     pthread_mutex_unlock(&character_mutex);
+    pthread_mutex_unlock(&character_mutex);
     if(col+j >= 72){
       flip = true;
       pthread_mutex_lock(&board_mutex);
@@ -534,4 +527,21 @@ void centipedeSpawner()
 
   pthread_join(enemy1, NULL);
   pthread_join(enemy2, NULL);
+}
+
+#define TIMESLICE_USEC 10000
+#define TIME_USECS_SIZE 1000000
+#define USEC_TO_NSEC 1000  
+struct timeval getTimeouts(int ticks) //function for select 
+{
+  struct timeval rqtp;
+
+  /* work in usecs at first */
+  rqtp.tv_usec = TIMESLICE_USEC * ticks;
+
+  /* handle usec overflow */
+  rqtp.tv_sec = rqtp.tv_usec / TIME_USECS_SIZE;
+  rqtp.tv_usec %= TIME_USECS_SIZE;
+
+  return rqtp;
 }

@@ -8,6 +8,8 @@
         "example.h": "c",
         "centipede.h": "c",
         "unistd.h": "c",
-        "random": "c"
+        "random": "c",
+        "select.h": "c",
+        "time.h": "c"
     }
 }

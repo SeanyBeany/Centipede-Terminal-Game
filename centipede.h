@@ -25,6 +25,7 @@
 #define QUIT_BODY 36
 #define QUIT_HEIGHT 1
 
+
 void centipedeMain();
 void runCentipede();
 void movePlayer();
@@ -34,12 +35,14 @@ void refresh();
 void keyboard();
 void upkeep();
 void fireRate();
-void setUpInput();
 void character();
 void centipede(int row, int col);
 void* bulletLocation(void *v);
 void* centipedeLocation(void *v);
 void centipedeSpawner();
+void setUpInput();
+struct timeval getTimeouts(int ticks);
+
 
 
 #endif
