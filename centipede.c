@@ -67,46 +67,6 @@ char* ENEMY_BODY2[ENEMY_BODY_ANIM_TILES][ENEMY_HEIGHT] =
   
 };
 
-char* QUIT_TEXT[QUIT_BODY][QUIT_HEIGHT] =
-{
-    {"p"},
-    {"r"},
-    {"e"},
-    {"s"},
-    {"s"},
-    {" "},
-    {"a"},
-    {"n"},
-    {"y"},
-    {" "},
-    {"b"},
-    {"u"},
-    {"t"},
-    {"t"},
-    {"o"},
-    {"n"},
-    {" "},
-    {"t"},
-    {"o"},
-    {" "},
-    {"q"},
-    {"u"},
-    {"i"},
-    {"t"},
-    {" "},
-    {"t"},
-    {"h"},
-    {"e"},
-    {" "},
-    {"p"},
-    {"r"},
-    {"o"},
-    {"g"},
-    {"r"},
-    {"a"},
-    {"m"}
-};
-
 pthread_mutex_t board_mutex; // mutex for board
 pthread_mutex_t end_mutex; // mutex for ending program
 pthread_mutex_t fire_mutex; // mutex to cap fire rate
@@ -185,9 +145,10 @@ void keyboard() {
         if (c == QUIT) {
             gameOver = true;
             for(int i = 0; i<QUIT_BODY; i++) {
-                char** tile = QUIT_TEXT[i];
+                char* s = "Press any button to quit the game";
+                int stringLength = 33;
                 pthread_mutex_lock(&board_mutex);
-                consoleDrawImage(10, 23+i, tile, CHARACTER_HEIGHT);
+                putString(s, MIDDLE_COLUMN, BOARD_MIDDLE-(stringLength/2), stringLength); //Put string "Game Over" in middle of screen
                 pthread_mutex_unlock(&board_mutex);
             }
             pthread_cond_signal(&end_signal);
@@ -387,6 +348,17 @@ void upkeep() {
         pthread_mutex_lock(&board_mutex);
         putString(str, 0, 25, 5); // put score onto board to the right of Score:
         pthread_mutex_unlock(&board_mutex);
+        
+        if(score >= 4000) {
+            pthread_mutex_lock(&board_mutex);
+            pthread_cond_signal(&end_signal);
+            char* s = "Congratulations YOU WIN";
+            int stringLength = 23;
+            putString(s, MIDDLE_COLUMN, BOARD_MIDDLE-(stringLength/2), stringLength); //Put string "Game Over" in middle of screen
+            gameOver = 1;
+            pthread_mutex_unlock(&board_mutex);
+        }
+
         if(hit && lives > 0) {
             pthread_mutex_lock(&board_mutex);
             consoleClearImage(0, 41, 1, strlen(lives3[0]));
@@ -436,7 +408,6 @@ void upkeep() {
             putString(s, MIDDLE_COLUMN, BOARD_MIDDLE-(stringLength/2), stringLength); //Put string "Game Over" in middle of screen
             gameOver = 1;
             pthread_mutex_unlock(&board_mutex);
-
         }
     }
 }
