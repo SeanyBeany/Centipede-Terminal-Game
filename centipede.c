@@ -113,15 +113,15 @@ pthread_mutex_t fire_mutex; // mutex to cap fire rate
 pthread_mutex_t character_mutex; // mutex for character
 pthread_mutex_t fired_mutex; // mutex to signal a bullet was fired
 pthread_mutex_t character_position_mutex; // mutex for character position
-pthread_cond_t end_signal_mutex; // mutex for signal to end program
+pthread_cond_t end_signal; // mutex for signal to end program
 pthread_cond_t fire_mutex_signal; // mutex for signal to cap fire rate
-pthread_cond_t fire_signal_mutex; // mutex to signal a bullet can be fired
-
+pthread_cond_t fire_signal; // mutex to signal a bullet can be fired
 pthread_t t1, t2, t3, t4, t5, t6, t7, t8, t9;
 int characterRow = BOARD_BOTTOM; // variable for character row position
 int characterCol = BOARD_MIDDLE; // variable for character column poisiton
 int gameOver = 0;
 int hit = 0; // boolean indicating whether the character has been hit or not
+int score = 0; // holds player score
 
 void centipedeMain(int argc, char**argv) 
 {
@@ -154,7 +154,7 @@ void centipedeMain(int argc, char**argv)
         perror("pthread_create");
     }
     
-    pthread_cond_wait(&end_signal_mutex, &end_mutex);
+    pthread_cond_wait(&end_signal, &end_mutex);
     pthread_join(t1, NULL);
     
     
@@ -163,6 +163,12 @@ void centipedeMain(int argc, char**argv)
     pthread_mutex_lock(&board_mutex);
     consoleFinish();
     pthread_mutex_unlock(&board_mutex);
+    pthread_mutex_destroy(&board_mutex);
+    pthread_mutex_destroy(&fire_mutex);
+    pthread_mutex_destroy(&end_mutex);
+    pthread_mutex_destroy(&fired_mutex);
+    pthread_mutex_destroy(&character_mutex);
+    pthread_mutex_destroy(&character_position_mutex);
 }
 
 void keyboard() {
@@ -184,7 +190,7 @@ void keyboard() {
                 consoleDrawImage(10, 23+i, tile, CHARACTER_HEIGHT);
                 pthread_mutex_unlock(&board_mutex);
             }
-            pthread_cond_signal(&end_signal_mutex);
+            pthread_cond_signal(&end_signal);
             pthread_mutex_unlock(&character_mutex);
         }
         else if (c == SPACE) {
@@ -232,7 +238,7 @@ void bullet() {
     char** bulletTile = BULLET[0];
     int bulletHeight = 0;
     int offScreen = 0;
-    pthread_cond_signal(&fire_signal_mutex); // signal fired so that you couldn't wait and be able to shoot x times faster than 50ms intended fire rate
+    pthread_cond_signal(&fire_signal); // signal fired so that you couldn't wait and be able to shoot x times faster than 50ms intended fire rate
     pthread_cond_wait(&fire_mutex_signal, &fire_mutex); // Wait for confirmation a bullet can fire
     int bulletRow = characterRow;
     int bulletCol = characterCol;
@@ -265,7 +271,7 @@ void bullet() {
 
 void fireRate() {
     while(!gameOver) {
-        pthread_cond_wait(&fire_signal_mutex, &fired_mutex); // Wait for confirmation of possible bullet fire
+        pthread_cond_wait(&fire_signal, &fired_mutex); // Wait for confirmation of possible bullet fire
         pthread_cond_signal(&fire_mutex_signal); // Signal bullet can be fired
         sleepTicks(50); // Limited fire rate so wait for another bullet to be able to fire
     }
@@ -370,13 +376,17 @@ void upkeep() {
     int lives = 3;
     char* CHARACTER[1][1] = {{"@"}};
     char** characterTile = CHARACTER[0];
-
     pthread_mutex_lock(&board_mutex);
     consoleDrawImage(0, 41, lives3, 1);
     pthread_mutex_unlock(&board_mutex);
 
     while(!gameOver) {
         sleepTicks(100);
+        char str[5];
+        sprintf(str, "%d", score);
+        pthread_mutex_lock(&board_mutex);
+        putString(str, 0, 25, 5); // put score onto board to the right of Score:
+        pthread_mutex_unlock(&board_mutex);
         if(hit && lives > 0) {
             pthread_mutex_lock(&board_mutex);
             consoleClearImage(0, 41, 1, strlen(lives3[0]));
@@ -389,6 +399,7 @@ void upkeep() {
             if(lives == 1) {
                 consoleDrawImage(0, 41, lives0, 1);
             }
+            
             consoleDrawImage(characterRow, characterCol, lives3, 1);
             consoleRefresh();
             pthread_mutex_unlock(&board_mutex);
@@ -418,8 +429,14 @@ void upkeep() {
         }
 
         if(lives == 0) {
-            pthread_cond_signal(&end_signal_mutex);
+            pthread_mutex_lock(&board_mutex);
+            pthread_cond_signal(&end_signal);
+            char* s = "Game Over";
+            int stringLength = 9;
+            putString(s, MIDDLE_COLUMN, BOARD_MIDDLE-(stringLength/2), stringLength); //Put string "Game Over" in middle of screen
             gameOver = 1;
+            pthread_mutex_unlock(&board_mutex);
+
         }
     }
 }
@@ -430,10 +447,12 @@ void centipede(int row, int col) {
   char** tile;
   int changeAnimation = false;
   int flipValue = 0;
-  int loopsBeforeBullet = 20;
+  int loopsBeforeBullet = 10;
   int pos1[2];
+  int tickSpeed = 20; //Speed of ticks between animations
   while(!gameOver){
-
+    pthread_mutex_lock(&character_mutex); //If character gets hit pause the animation
+     pthread_mutex_unlock(&character_mutex);
     if(col+j >= 72){
       flip = true;
       pthread_mutex_lock(&board_mutex);
@@ -487,7 +506,7 @@ void centipede(int row, int col) {
       }
       pthread_mutex_unlock(&board_mutex);
     }
-    sleepTicks(10);
+    sleepTicks(tickSpeed);
     if(loopsBeforeBullet == 0) { 
         if(flip) {
             pos1[0] = row+1;
@@ -498,7 +517,7 @@ void centipede(int row, int col) {
             pos1[1] = col+j+1;
         }
         pthread_create(&t8, NULL, (void *) &bulletLocation, (void*) pos1);
-        loopsBeforeBullet = 20;
+        loopsBeforeBullet = 5;
     }
     else {
         loopsBeforeBullet--;
@@ -506,6 +525,9 @@ void centipede(int row, int col) {
 
     if(changeAnimation) {
       changeAnimation = false;
+      if(tickSpeed > 10){
+        tickSpeed--;
+      }
     }
     else {
       changeAnimation = true;
