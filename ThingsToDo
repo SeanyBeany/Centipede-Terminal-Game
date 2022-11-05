@@ -4,11 +4,18 @@
 
 #make caterpillar break into threads which die and disappear when size 1
 #add 100 score when caterpillars break into threads
-#win when you get 4000 score
-#lose when you get 0 lives
-#join all threads and quit cleanly
 DONE
 
+when no lives left.
+[0.5] basic caterpillars –  wraps properly
+[3] joins all threads and quits cleanly
+[3] Advanced caterpillars – breaks when hit, spawning new thread. Dies when too small.
+
+
+
+
+
+[5] listing.txt //Don't forget!!! ONLY CROSS OFF WHEN YOU CHECK THAT IT GOT SUBMITTED along with makefile
 
 
 
@@ -26,20 +33,6 @@ DONE
 
 
 
+MIGHT IMPLEMENT
+[0.5] basic caterpillars –  wraps properly //
 
-
-
-
-
-
-
-
-
-PROBABLY NOT NEEDED
-#make caterpillar shoot bullets
-
-
-
-REMOVED
-#caterpillar wraps properly on walls
-#add caterpillar to main program
