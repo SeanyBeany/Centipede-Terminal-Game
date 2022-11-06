@@ -40,7 +40,6 @@ void centipedeBullet(int bulletRow, int bulletCol);
 void refresh();
 void keyboard();
 void upkeep();
-void fireRate();
 void character();
 void centipede(int row, int col);
 void* bulletLocation(void *v);

@@ -9,12 +9,8 @@ DONE
 when no lives left.
 [0.5] basic caterpillars –  wraps properly
 [3] joins all threads and quits cleanly
+[1] add win condition when caterpillars are all gone
 [3] Advanced caterpillars – breaks when hit, spawning new thread. Dies when too small.
-
-
-
-
-
 [5] listing.txt //Don't forget!!! ONLY CROSS OFF WHEN YOU CHECK THAT IT GOT SUBMITTED along with makefile
 
 

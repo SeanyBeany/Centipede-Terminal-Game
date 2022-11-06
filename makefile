@@ -1,6 +1,6 @@
 CC = gcc
 
-BASEFLAGS = -Wall -pthread -std=c99
+BASEFLAGS = -Wall -pthread -std=c99 -D_XOPEN_SOURCE=700
 NODEBUG_FLAGS = -dNDEBUG 
 DEBUG_FLAGS = -g
 

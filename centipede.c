@@ -74,12 +74,10 @@ pthread_mutex_t board_mutex; // mutex for board
 pthread_mutex_t end_mutex; // mutex for ending program
 pthread_mutex_t fire_mutex; // mutex to cap fire rate
 pthread_mutex_t character_mutex; // mutex for character
-pthread_mutex_t fired_mutex; // mutex to signal a bullet was fired
 pthread_mutex_t character_position_mutex; // mutex for character position
 pthread_mutex_t centipede_bullet_mutex; // Mutex for centipede bullet signal
 pthread_mutex_t bullet_location; // mutex for bullet location
 pthread_cond_t end_signal; // mutex for signal to end program
-pthread_cond_t fire_mutex_signal; // mutex for signal to cap fire rate
 pthread_cond_t fire_signal; // mutex to signal a bullet can be fired
 pthread_cond_t centipede_bullet_signal; // Signal to create centipede
 pthread_t t1, t2, t3, t4, t5, t6, t7, t8;
@@ -98,14 +96,13 @@ void centipedeMain(int argc, char**argv)
     if(pthread_mutex_init(&board_mutex, NULL) != 0){ perror("Mutex initialization failed");}
     if(pthread_mutex_init(&fire_mutex, NULL) != 0){ perror("Mutex initialization failed");}
     if(pthread_mutex_init(&end_mutex, NULL) != 0){ perror("Mutex initialization failed");}
-    if(pthread_mutex_init(&fired_mutex, NULL) != 0){ perror("Mutex initialization failed");}
     if(pthread_mutex_init(&board_mutex, NULL) != 0){ perror("Mutex initialization failed");}
     if(pthread_mutex_init(&character_mutex, NULL) != 0){ perror("Mutex initialization failed");}
     if(pthread_mutex_init(&character_position_mutex, NULL) != 0){perror("Mutex initialization failed");}
     if(pthread_mutex_init(&centipede_bullet_mutex, NULL) != 0){perror("Mutex initialization failed");}
     if(pthread_mutex_init(&bullet_location, NULL) != 0){perror("Mutex initialization failed");}
     if(pthread_cond_init(&end_signal, NULL) != 0){perror("Condition initialization failed");}
-    if(pthread_cond_init(&fire_mutex_signal, NULL) != 0){perror("Condition initialization failed");}
+    
     if(pthread_cond_init(&fire_signal, NULL) != 0){perror("Condition initialization failed");}
     if(pthread_cond_init(&centipede_bullet_signal, NULL) != 0){perror("Condition initialization failed");}
     
@@ -117,7 +114,6 @@ void centipedeMain(int argc, char**argv)
     if (pthread_create(&t1, NULL, (void *) &keyboard, NULL) != 0){ perror("pthread_create");}
     if (pthread_create(&t2, NULL, (void *) &refresh, NULL) != 0){ perror("pthread_create");}
     if (pthread_create(&t3, NULL, (void *) &upkeep, NULL) != 0){perror("pthread_create");}
-    if (pthread_create(&t4, NULL, (void *) &fireRate, NULL) != 0){perror("pthread_create");}
     if (pthread_create(&t5, NULL, (void *) &character, NULL) != 0){perror("pthread_create");}
     if (pthread_create(&t6, NULL, (void *) &centipedeBulletArrayList, NULL) != 0){perror("pthread_create");}
     if (pthread_create(&t7, NULL, (void *) &centipedeSpawner, NULL) != 0){perror("pthread_create");}
@@ -132,24 +128,22 @@ void centipedeMain(int argc, char**argv)
     if(pthread_join(t2, NULL) != 0) {perror("pthread_join error");}
     if(pthread_join(t3, NULL) != 0) {perror("pthread_join error");}
     if(pthread_cond_signal(&fire_signal) != 0){ perror("Error in pthread_cond_signal:");} //send a signal to stop fireRate from waiting indefinitely
-    if(pthread_cond_signal(&fire_mutex_signal) != 0){ perror("Error in pthread_cond_signal:");}
-    if(pthread_join(t4, NULL) != 0) {perror("pthread_join error");}
+    
     if(pthread_join(t5, NULL) != 0) {perror("pthread_join error");}
     if(pthread_join(t6, NULL) != 0) {perror("pthread_join error");}
     if(pthread_join(t7, NULL) != 0) {perror("pthread_join error");}
-
+    
 
     /** Destroy all the created mutexes */
     if(pthread_mutex_destroy(&board_mutex) != 0) {perror("Error destroying board mutex");} 
     if(pthread_mutex_destroy(&fire_mutex) != 0) {perror("Error destroying fire mutex");} 
     if(pthread_mutex_destroy(&end_mutex) != 0) {perror("Error destroying end mutex");} 
-    if(pthread_mutex_destroy(&fired_mutex) != 0) {perror("Error destroying fired mutex");} 
     if(pthread_mutex_destroy(&character_mutex) != 0) {perror("Error destroying character mutex");} 
     if(pthread_mutex_destroy(&character_position_mutex) != 0) {perror("Error destroying character position mutex");}
     if(pthread_mutex_destroy(&centipede_bullet_mutex) != 0) {perror("Error destroying centipede bullet mutex");}
     if(pthread_mutex_destroy(&bullet_location) != 0) {perror("Error destroying bullet location mutex");} 
     //if(pthread_cond_destroy(&end_signal) != 0){perror("Error destroying end signal");}
-    //if(pthread_cond_destroy(&fire_mutex_signal) != 0){perror("Error destroying fire mutex signal");}
+    
     //if(pthread_cond_destroy(&fire_signal) != 0){perror("Error destroying fire signal");}
     //if(pthread_cond_destroy(&centipede_bullet_signal) != 0){perror("Error destroying centipede bullet signal");}
 }
@@ -280,20 +274,6 @@ void bullet() {
         if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
     }
 
-}
-
-/** Function that limits fire rate of bullets 
- */
-void fireRate() {
-    if(pthread_cond_wait(&fire_signal, &fired_mutex) != 0) {perror("Error waiting for fire_signal");} // allows for the first bullet to be fired without a delay
-    if(pthread_cond_signal(&fire_mutex_signal) != 0) { perror("Error sending fire signal");}
-    while(!gameOver) {
-        sleepTicks(50); // Limited fire rate so wait for another bullet to be able to fire
-        // Wait for confirmation of possible bullet fire
-        if(pthread_cond_wait(&fire_signal, &fired_mutex) != 0) {perror("Error waiting for fire_signal");}
-        // Signal bullet can be fired
-        if(pthread_cond_signal(&fire_mutex_signal) != 0) { perror("Error sending fire signal");}
-    }
 }
 
 /** function that handles character animation
@@ -489,6 +469,7 @@ void centipede(int row, int col) {
   int loopsBeforeBullet = 10; // loops before a centipede bullet is created
   int tickNumber = 20; //number of ticks between animations
   int loopCounter = 0; //Counter for how many loops have elapsed since the last tick speed increase
+  struct timespec rqtp, rmtp = {0, 1000}; // used for nanosleep to wait 1 micro second so the program can sleep inbetween waiting for the lock to be released
   while(!gameOver){
     pthread_mutex_lock(&character_mutex); //If character gets hit pause the animation
     pthread_mutex_unlock(&character_mutex);
@@ -554,7 +535,12 @@ void centipede(int row, int col) {
     }
     sleepTicks(tickNumber); // sleep for tickNumber ticks
     if(loopsBeforeBullet == 0) { // if loopsBeforeBullet is 0 we create a new bullet below the centipede
-        if(pthread_mutex_lock(&bullet_location) != 0) {perror("error locking");} // lock so caterpillar spawner can use location information atomically
+        while(pthread_mutex_trylock(&bullet_location) != 0) { //loop to prevent deadlock
+            nanosleep(&rqtp, &rmtp);
+            if(gameOver){
+                pthread_exit(0); 
+            }
+        }
         if(flip) {
             bulletPos[0] = row+1;
             bulletPos[1] = col+j+4;
@@ -656,7 +642,7 @@ struct timeval getTimeouts(int ticks) //function for select
 void insert_end(Node** head, pthread_t* t) { //Function that inserts a node to the end of the linked list
     Node* node = malloc(sizeof(Node));
     if(node == NULL) {
-        exit(1);
+        return;
     }
     node->next = NULL;
     node->t = t;
@@ -680,7 +666,7 @@ void remove_head(Node** head) { //Function that deletes the head node in a linke
 
     Node* temp = *head;
     *head = (*head)->next;
-    free(temp);
+    free(temp); // free the pthread_t pointers memory
 }
 
 /** function that manages centipede bullets in an array list
@@ -722,9 +708,9 @@ void characterBulletArrayList() {
     int i = 0; // counter index for while loop
     int threadCounter = 0; // counter of total threads
     pthread_t th[CHARACTER_BULLET_ARRAY]; // initialization of pthread_t
-    while(!gameOver) { // while game is running create a new thread when a signal to create a new thread is received
+    while(!gameOver) { // while game is running create a new thread when a signal that we can create a new bullet thread is received
     // Wait for confirmation a bullet can fire
-    if(pthread_cond_wait(&fire_mutex_signal, &fire_mutex) != 0) { perror("Error in pthread_cond_wait");}
+    if(pthread_cond_wait(&fire_signal, &fire_mutex) != 0) { perror("Error in pthread_cond_wait");}
         if(gameOver) {
             break; // need to break if the game is over so we can free threads
         }
@@ -732,6 +718,7 @@ void characterBulletArrayList() {
         insert_end(&head, &th[i]);
         threadCounter++;
         i++;
+        sleepTicks(60); // limits fire rate
     }
     
     for(i = 0; i < threadCounter; i++) {
