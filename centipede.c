@@ -82,7 +82,7 @@ pthread_cond_t end_signal; // mutex for signal to end program
 pthread_cond_t fire_mutex_signal; // mutex for signal to cap fire rate
 pthread_cond_t fire_signal; // mutex to signal a bullet can be fired
 pthread_cond_t centipede_bullet_signal; // Signal to create centipede
-pthread_t t1, t2, t3, t4, t5, t6, t7, t8, t9;
+pthread_t t1, t2, t3, t4, t5, t6, t7, t8;
 int characterRow = BOARD_BOTTOM; // variable for character row position
 int characterCol = BOARD_MIDDLE; // variable for character column poisiton
 int gameOver = false; // boolean indicating that the game should end
@@ -121,6 +121,7 @@ void centipedeMain(int argc, char**argv)
     if (pthread_create(&t5, NULL, (void *) &character, NULL) != 0){perror("pthread_create");}
     if (pthread_create(&t6, NULL, (void *) &centipedeBulletArrayList, NULL) != 0){perror("pthread_create");}
     if (pthread_create(&t7, NULL, (void *) &centipedeSpawner, NULL) != 0){perror("pthread_create");}
+    if (pthread_create(&t8, NULL, (void *) &characterBulletArrayList, NULL) != 0){perror("pthread_create");}
     // We pause until we get a signal to end the game
     if(pthread_cond_wait(&end_signal, &end_mutex) != 0){perror("pthread_cond_wait error");}
     if(pthread_cond_signal(&centipede_bullet_signal) != 0) {perror("Error signaling");} // signal the centipedeBulletArray to finish waiting
@@ -196,8 +197,8 @@ void keyboard() {
                 if(pthread_mutex_unlock(&character_mutex) != 0) {perror("Error unlocking:");}
             }
             else if (c == SPACE) {
-                // Create a bullet thread
-                if(pthread_create(&t9, NULL, (void *) &bullet, NULL) != 0){perror("Error creating bullet thread");}
+                // send a signal to create a bullet thread
+                if(pthread_cond_signal(&fire_signal) != 0){ perror("Error in pthread_cond_signal:");}
                 if(pthread_mutex_unlock(&character_mutex) != 0) {perror("Error unlocking");}
             }
             else {
@@ -249,12 +250,6 @@ void bullet() {
     char** bulletTile = BULLET[0]; //setting a pointer to the bullet icon pointer
     int bulletHeight = 0; //the height of the bullet
     int offScreen = 0; //variable to check if bullet if offscreen
-
-    // signal fired so that you couldn't wait and be able to shoot x times faster than 50ms intended fire rate
-    if(pthread_cond_signal(&fire_signal) != 0){ perror("Error in pthread_cond_signal:");}
-    
-    // Wait for confirmation a bullet can fire
-    if(pthread_cond_wait(&fire_mutex_signal, &fire_mutex) != 0) { perror("Error in pthread_cond_wait");}
     
     //set bullet coordinates to player coordinates
     int bulletRow = characterRow; 
@@ -696,7 +691,7 @@ void centipedeBulletArrayList() {
     pthread_t* p; // pointer to the first thread in the node
     int i = 0; // counter index for while loop
     int threadCounter = 0; // counter of total threads
-    pthread_t th[CENTIPEDE_ARRAY]; // initialization of pthread_t
+    pthread_t th[CENTIPEDE_BULLET_ARRAY]; // initialization of pthread_t
     if(pthread_mutex_init(&centipede_bullet_mutex, NULL) != 0){perror("Error initializing mutex:");} //initialize mutex
     while(!gameOver) { // while game is running create a new thread when a signal to create a new thread is received
         if(pthread_cond_wait(&centipede_bullet_signal, &centipede_bullet_mutex) != 0){perror("pthread_cond_wait");}
@@ -719,21 +714,21 @@ void centipedeBulletArrayList() {
     }
 }
 
-/** function that manages player bullets in an array list
+/** function that manages character bullets in an array list
  */
-void bulletArrayList() {
+void characterBulletArrayList() {
     Node* head = NULL; // create the head node
     pthread_t* p; // pointer to the first thread in the node
     int i = 0; // counter index for while loop
     int threadCounter = 0; // counter of total threads
-    pthread_t th[CENTIPEDE_ARRAY]; // initialization of pthread_t
+    pthread_t th[CHARACTER_BULLET_ARRAY]; // initialization of pthread_t
     while(!gameOver) { // while game is running create a new thread when a signal to create a new thread is received
-        if(pthread_cond_wait(&centipede_bullet_signal, &centipede_bullet_mutex) != 0){perror("pthread_cond_wait");}
+    // Wait for confirmation a bullet can fire
+    if(pthread_cond_wait(&fire_mutex_signal, &fire_mutex) != 0) { perror("Error in pthread_cond_wait");}
         if(gameOver) {
             break; // need to break if the game is over so we can free threads
         }
-        pthread_mutex_unlock(&bullet_location); // unlock bullet_location since bullet location was stored in this program and it's a critical resource
-        if(pthread_create(&th[i], NULL, (void *) &bulletLocation, NULL) != 0){perror("pthread_create");}
+        if(pthread_create(&th[i], NULL, (void *) &bullet, NULL) != 0){perror("pthread_create");}
         insert_end(&head, &th[i]);
         threadCounter++;
         i++;

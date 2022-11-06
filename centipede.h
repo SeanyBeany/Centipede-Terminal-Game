@@ -14,8 +14,8 @@
 #define CHARACTER_HEIGHT 1
 #define BULLET_HEIGHT 1
 #define PTHREAD_MUTEX_NORMAL 0
-#define CENTIPEDE_ARRAY 500
-#define BULLET_ARRAY 500
+#define CENTIPEDE_BULLET_ARRAY 500
+#define CHARACTER_BULLET_ARRAY 500
 #define BOARD_TOP 13
 #define BOARD_BOTTOM 14
 #define BOARD_LEFT_SIDE 1
@@ -50,7 +50,7 @@ void setUpInput();
 void insert_end(Node** head, pthread_t* t);
 void remove_head(Node** head);
 void centipedeBulletArrayList();
-void bulletArrayList();
+void characterBulletArrayList();
 
 struct timeval getTimeouts(int ticks);
 
