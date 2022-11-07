@@ -80,7 +80,7 @@ pthread_mutex_t bullet_location; // mutex for bullet location
 pthread_cond_t end_signal; // mutex for signal to end program
 pthread_cond_t fire_signal; // mutex to signal a bullet can be fired
 pthread_cond_t centipede_bullet_signal; // Signal to create centipede
-pthread_t t1, t2, t3, t4, t5, t6, t7, t8;
+pthread_t t1, t2, t3, t4, t5, t6, t7;
 int characterRow = BOARD_BOTTOM; // variable for character row position
 int characterCol = BOARD_MIDDLE; // variable for character column poisiton
 int gameOver = false; // boolean indicating that the game should end
@@ -101,7 +101,6 @@ void centipedeMain(int argc, char**argv)
     if(pthread_mutex_init(&centipede_bullet_mutex, NULL) != 0){perror("Mutex initialization failed");}
     if(pthread_mutex_init(&bullet_location, NULL) != 0){perror("Mutex initialization failed");}
     if(pthread_cond_init(&end_signal, NULL) != 0){perror("Condition initialization failed");}
-    
     if(pthread_cond_init(&fire_signal, NULL) != 0){perror("Condition initialization failed");}
     if(pthread_cond_init(&centipede_bullet_signal, NULL) != 0){perror("Condition initialization failed");}
     
@@ -592,8 +591,9 @@ void centipedeSpawner()
   int pos1[] = {2,0};
   int threadNumber = 0; // number of threads spawned
   int i; // index for loop
+  int maxEnemies = 5; // maximum number of enemies to spawn
   /** spawn centipede and wait for a random time between above 10 and below 24 seconds */
-  while(!gameOver) {
+  while(maxEnemies > 0) {
     pthread_create(&enemy1[threadNumber], NULL, centipedeLocation, (void*)pos1);
     r = (rand() % 10)+10;
     r *= 50; // multiply by 50 since we sleep ticks and 1s = 1000ms and 1000/20 = 50
@@ -607,6 +607,7 @@ void centipedeSpawner()
         sleepTicks(1);
     }
     threadNumber++;
+    maxEnemies--;
   }
 }
 
