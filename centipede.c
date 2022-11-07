@@ -463,20 +463,21 @@ void upkeep() {
  * that are handled by the centipedeBullet function
  */
 void centipede(int row, int col) {
-  int j = -7; // used to calculate the correct column index to draw and clear centipede segments
-  int flip = false; //Variable to determine if the centipede was flipped
-  char** tile;
-  int changeAnimation = false; //Variable to determine if the animation was changed
-  int loopsBeforeBullet = 10; // loops before a centipede bullet is created
-  int tickNumber = 20; //number of ticks between animations
-  int loopCounter = 0; //Counter for how many loops have elapsed since the last tick speed increase
-  while(!gameOver){
+    int size = 8; // size of the caterpillar
+    int j = -7; // used to calculate the correct column index to draw and clear centipede segments
+    int flip = false; //Variable to determine if the centipede was flipped
+    char** tile;
+    int changeAnimation = false; //Variable to determine if the animation was changed
+    int loopsBeforeBullet = 10; // loops before a centipede bullet is created
+    int tickNumber = 20; //number of ticks between animations
+    int loopCounter = 0; //Counter for how many loops have elapsed since the last tick speed increase
+    while(!gameOver){
     pthread_mutex_lock(&character_mutex); //If character gets hit pause the animation
     pthread_mutex_unlock(&character_mutex);
     
     if(row == 11) { //If centipede hits the bottom of the screen delete it and create a new centipede at the top
         if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
-        consoleClearImage(row, j, 1, 8);
+        consoleClearImage(row, j, 1, size);
         if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
         row = 2;
         col = 0;
@@ -485,18 +486,18 @@ void centipede(int row, int col) {
         changeAnimation = false;
     }
 
-    if(col+j >= 72){ //If the centipede is at the right side of the screen move down and flip the character and its movement direction
+    if(col+j >= 80-size){ //If the centipede is at the right side of the screen move down and flip the character and its movement direction
       flip = true;
       if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
-      consoleClearImage(row, j, 1, 8);
+      consoleClearImage(row, j, 1, size);
       if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
       row++;
     }
 
-    if(col+j <= 1 && flip == true) { //If the centipede is at the left side of the screen move down and flip the character and its movement direction
+    if(col+j <= 0 && flip == true) { //If the centipede is at the left side of the screen move down and flip the character and its movement direction
       flip = false;
       if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
-      consoleClearImage(row, j, 1, 8);
+      consoleClearImage(row, j, 1, size);
       if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
       row++;
     }
@@ -510,15 +511,15 @@ void centipede(int row, int col) {
 
     if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
     consoleClearImage(row, j+col-1, 1, 1); // Clear the centipede drawing above
-    consoleClearImage(row, j+8, 1, 1); 
+    consoleClearImage(row, j+size, 1, 1); 
     if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
-    for (int i = 0; i<ENEMY_BODY_ANIM_TILES; i++) { //loop over the whole centipede animation once 
+    for (int i = 0; i<size; i++) { //loop over the whole centipede animation once 
       if(changeAnimation) { // If the animation is changed we use the first centipede animation
         if(flip == false) { // if the centipede is flipped we draw it reversed, otherwise we draw it regularly
           tile = ENEMY_BODY[i]; 
             }
         else {
-          tile = ENEMY_BODY[7-i];
+          tile = ENEMY_BODY[size-1-i];
             }
         }
         else { // If the animation is not changed we use the second centipede animation
@@ -526,7 +527,7 @@ void centipede(int row, int col) {
           tile = ENEMY_BODY2[i];
         }
         else {
-            tile = ENEMY_BODY2[7-i];
+            tile = ENEMY_BODY2[size-1-i];
             }
         }
         if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
@@ -678,9 +679,13 @@ void centipedeBulletArrayList() {
     pthread_t* p; // pointer to the first thread in the node
     int i = 0; // counter index for while loop
     int threadCounter = 0; // counter of total threads
-    pthread_t th[CENTIPEDE_BULLET_ARRAY]; // initialization of pthread_t
+    int removeIndex = 0; // index to remove next head and join the thread
+    pthread_t th[CENTIPEDE_BULLET_ARRAY_MAX]; // initialization of pthread_t
     if(pthread_mutex_init(&centipede_bullet_mutex, NULL) != 0){perror("Error initializing mutex:");} //initialize mutex
     while(!gameOver) { // while game is running create a new thread when a signal to create a new thread is received
+        if(i == CENTIPEDE_BULLET_ARRAY_MAX) { // to avoid overflow if we reach the top of the array we reset to the beginning
+            i = 0;
+        }
         if(pthread_cond_wait(&centipede_bullet_signal, &centipede_bullet_mutex) != 0){perror("pthread_cond_wait");}
         if(gameOver) {
             break; // need to break if the game is over so we can free threads
@@ -692,9 +697,15 @@ void centipedeBulletArrayList() {
         insert_end(&head, &th[i]);
         threadCounter++;
         i++;
+        if(threadCounter-removeIndex > 60) { // joining the old offscreen threads (there can be over 50 bullets on screen at a time so for safety we clear after 60)
+            p = head->t;
+            remove_head(&head);
+            if(pthread_join(*p, NULL) !=0 ) {printf("Error joining thread");}
+            removeIndex++;
+        }
     }
     
-    for(i = 0; i < threadCounter; i++) {
+    for(i = removeIndex; i < threadCounter; i++) {
         p = head->t;
         remove_head(&head);
         if(pthread_join(*p, NULL) !=0 ) {printf("Error joining thread");}
@@ -708,8 +719,12 @@ void characterBulletArrayList() {
     pthread_t* p; // pointer to the first thread in the node
     int i = 0; // counter index for while loop
     int threadCounter = 0; // counter of total threads
-    pthread_t th[CHARACTER_BULLET_ARRAY]; // initialization of pthread_t
+    pthread_t th[CHARACTER_BULLET_ARRAY_MAX]; // initialization of pthread_t
+    int removeIndex = 0; // index to remove next head and join the thread
     while(!gameOver) { // while game is running create a new thread when a signal that we can create a new bullet thread is received
+    if(i == CHARACTER_BULLET_ARRAY_MAX) { // to avoid overflow if we reach the top of the array we reset to the beginning
+        i = 0;
+    }
     // Wait for confirmation a bullet can fire
     if(pthread_cond_wait(&fire_signal, &fire_mutex) != 0) { perror("Error in pthread_cond_wait");}
         if(gameOver) {
@@ -720,9 +735,15 @@ void characterBulletArrayList() {
         threadCounter++;
         i++;
         sleepTicks(60); // limits fire rate
+        if(threadCounter-removeIndex > 10) { // joining the old offscreen threads
+            p = head->t;
+            remove_head(&head);
+            if(pthread_join(*p, NULL) !=0 ) {printf("Error joining thread");}
+            removeIndex++;
+        }
     }
     
-    for(i = 0; i < threadCounter; i++) {
+    for(i = removeIndex; i < threadCounter; i++) { // joining last left over threads
         p = head->t;
         remove_head(&head);
         if(pthread_join(*p, NULL) !=0 ) {printf("Error joining thread");}
