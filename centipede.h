@@ -14,8 +14,8 @@
 #define CHARACTER_HEIGHT 1
 #define BULLET_HEIGHT 1
 #define PTHREAD_MUTEX_NORMAL 0
-#define CENTIPEDE_BULLET_ARRAY 500
-#define CHARACTER_BULLET_ARRAY 500
+#define CENTIPEDE_BULLET_ARRAY 1000
+#define CHARACTER_BULLET_ARRAY 1000
 #define BOARD_TOP 13
 #define BOARD_BOTTOM 14
 #define BOARD_LEFT_SIDE 1
@@ -26,7 +26,7 @@
 #define ENEMY_BODY_ANIM_TILES 8 
 #define QUIT_BODY 36
 #define QUIT_HEIGHT 1
-
+#define WIN_CONDITION_TESTING 'r'
 typedef struct Node {
     pthread_t* t;
     struct Node* next;

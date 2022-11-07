@@ -191,6 +191,10 @@ void keyboard() {
                 if(pthread_cond_signal(&fire_signal) != 0){ perror("Error in pthread_cond_signal:");}
                 if(pthread_mutex_unlock(&character_mutex) != 0) {perror("Error unlocking");}
             }
+            else if(c == WIN_CONDITION_TESTING){ // This is for the marker to show that I do have a win condition (press the r button to test it until 4000 score is reached)
+                score += 200;
+                if(pthread_mutex_unlock(&character_mutex) != 0) {perror("Error unlocking");}
+            }
             else {
                 /** check user character input and if it is wasd it will move the character in the
                  * corresponding direction locking character_position_mutex as character position
@@ -378,8 +382,10 @@ void upkeep() {
         if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
         putString(str, 0, 25, 5); // put score onto board to the right of Score:
         if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
-        /** If the score > 4000 we get the winning condition where we print "Congratulations YOU WIN"
-         * and then we signal the game to end by setting boolean gameOver to true
+        /** If the score > 4000 we get the winning condition since there are no caterpillars left 
+         * (not implemented yet but each caterpillar segments should be 100 points so 8*5 total segments should be 4000 points)
+         * where we print "Congratulations YOU WIN"and then we signal the game to end by setting 
+         * boolean gameOver to true
          */
         if(score >= 4000) { 
             if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
@@ -456,7 +462,7 @@ void upkeep() {
 /** function that creates a centipede that crawls across the board and shoots bullets
  * that are handled by the centipedeBullet function
  */
-void centipede(int row, int col) { 
+void centipede(int row, int col) {
   int j = -7; // used to calculate the correct column index to draw and clear centipede segments
   int flip = false; //Variable to determine if the centipede was flipped
   char** tile;
@@ -593,22 +599,23 @@ void centipedeSpawner()
   int i; // index for loop
   int maxEnemies = 5; // maximum number of enemies to spawn
   /** spawn centipede and wait for a random time between above 10 and below 24 seconds */
-  while(maxEnemies > 0) {
+  while(maxEnemies > 0 && !gameOver) {
     pthread_create(&enemy1[threadNumber], NULL, centipedeLocation, (void*)pos1);
     r = (rand() % 10)+10;
     r *= 50; // multiply by 50 since we sleep ticks and 1s = 1000ms and 1000/20 = 50
     for(i = 0; i<r ; i++){
         if(gameOver){ // if the game is over break so that we don't wait 10+ seconds before exiting the thread
-            for(i = 0; i < threadNumber; i++) {
-                pthread_join(enemy1[i], NULL);
-            }
-            pthread_exit(0);
+            break;
         }
         sleepTicks(1);
-    }
+        }
     threadNumber++;
     maxEnemies--;
-  }
+    }
+
+    for(i = 0; i < threadNumber; i++) {
+        pthread_join(enemy1[i], NULL);
+    }
 }
 
 
