@@ -510,8 +510,10 @@ void centipede(int row, int col) {
     }
 
     if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
-    consoleClearImage(row, j+col-1, 1, 1); // Clear the centipede drawing above
-    consoleClearImage(row, j+size, 1, 1); 
+    consoleClearImage(row, j+col-1, 1, 1); // Clear the previous segment drawing behind the centipede
+    if(flip) {
+        consoleClearImage(row, j+size, 1, 1);  // Clear the previous segment drawing in front of the centipede
+    }
     if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
     for (int i = 0; i<size; i++) { //loop over the whole centipede animation once 
       if(changeAnimation) { // If the animation is changed we use the first centipede animation

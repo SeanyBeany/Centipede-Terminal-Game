@@ -9,10 +9,8 @@ DONE
 when no lives left.
 
 IMPLEMENTING
+Get collision working for the caterpillar
 [3] Advanced caterpillars – breaks when hit, spawning new thread. Dies when too small.
-SECOND THING TO IMPLEMENT
-[0.5] add win condition when caterpillars are all gone
-
 
 THIRD THING IMPLEMENTING
 [5] listing.txt //Don't forget!!! ONLY CROSS OFF WHEN YOU CHECK THAT IT GOT SUBMITTED along with makefile
