@@ -1,10 +1,3 @@
-/**********************************************************************
-  Module: makefile
-  Author: Shawn Whalen
-
-  Purpose: makefile includes all the make commands
-
-**********************************************************************/
 CC = gcc
 
 BASEFLAGS = -Wall -pthread -std=c99 -D_XOPEN_SOURCE=700
