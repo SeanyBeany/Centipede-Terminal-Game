@@ -463,7 +463,7 @@ void upkeep() {
  * that are handled by the centipedeBullet function
  */
 void centipede(int row, int col) {
-    int size = 8; // size of the caterpillar
+    int size = 4; // size of the caterpillar
     int j = -7; // used to calculate the correct column index to draw and clear centipede segments
     int flip = false; //Variable to determine if the centipede was flipped
     char** tile;
@@ -471,6 +471,8 @@ void centipede(int row, int col) {
     int loopsBeforeBullet = 10; // loops before a centipede bullet is created
     int tickNumber = 20; //number of ticks between animations
     int loopCounter = 0; //Counter for how many loops have elapsed since the last tick speed increase
+    int rightWrappingIndex = 80-size+1; // index used for caterpillar wrapping when hitting the right boarder of the game board
+    int leftWrappingIndex = size-2; // index used for caterpillar wrapping when hitting the left boarder of the game board
     while(!gameOver){
     pthread_mutex_lock(&character_mutex); //If character gets hit pause the animation
     pthread_mutex_unlock(&character_mutex);
@@ -486,20 +488,48 @@ void centipede(int row, int col) {
         changeAnimation = false;
     }
 
-    if(col+j >= 80-size){ //If the centipede is at the right side of the screen move down and flip the character and its movement direction
-      flip = true;
-      if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
-      consoleClearImage(row, j, 1, size);
-      if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
+    if(col+j >= BOARD_RIGHT_BORDER-size){ //If the centipede is at the right side of the screen set boolean flip to true and animate the centipede wrapping downward
+        flip = true; //sets boolean true if the centipede flipped (is on an odd row)
+        for(int j = 0; j < size; j++) { // wrapping animation for the centipede
+            pthread_mutex_lock(&character_mutex); //If character gets hit pause the animation
+            pthread_mutex_unlock(&character_mutex);
+            for (int i = 0; i<size; i++) { //loop over the whole centipede animation once 
+                tile = ENEMY_BODY[i];
+                if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
+                consoleClearImage(row, rightWrappingIndex-1, 1, 1);  // Clear the previous segment drawing in front of the centipede
+                if(rightWrappingIndex+i >= BOARD_RIGHT_BORDER) { // if the centipede is off the screen start drawing it below going in the opposite direction
+                    consoleDrawImage(row+1, BOARD_RIGHT_BORDER-size+i, tile, ENEMY_HEIGHT); // Draw the tile to the screen
+                }
+                consoleDrawImage(row, rightWrappingIndex, tile, ENEMY_HEIGHT); // Draw the tile to the screen
+                if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
+            }
+        sleepTicks(tickNumber); // sleep for tickNumber ticks
+        rightWrappingIndex++;
+      }
       row++;
+      rightWrappingIndex = 80-size+1; // reset the variable to original value
     }
 
-    if(col+j <= 0 && flip == true) { //If the centipede is at the left side of the screen move down and flip the character and its movement direction
-      flip = false;
-      if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
-      consoleClearImage(row, j, 1, size);
-      if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
+    if(col+j <= 0 && flip == true) { //If the centipede is at the left side of the screen set flip to false and animate the centipede wrapping downward
+      flip = false; //sets boolean false if the centipede flipped (is on an even row)
+      for(int j = 0; j < size; j++) { // wrapping animation for the centipede
+            pthread_mutex_lock(&character_mutex); //If character gets hit pause the animation
+            pthread_mutex_unlock(&character_mutex);
+            for (int i = 0; i<size; i++) { //loop over the whole centipede animation once 
+                tile = ENEMY_BODY[i];
+                if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
+                consoleClearImage(row, leftWrappingIndex+1, 1, 1);  // Clear the previous segment drawing in front of the centipede
+                if(leftWrappingIndex-i < BOARD_LEFT_BORDER) { // if the centipede is off the screen start drawing it below going in the opposite direction
+                    consoleDrawImage(row+1, BOARD_LEFT_BORDER+size-i-1, tile, ENEMY_HEIGHT); // Draw the tile to the screen
+                }
+                consoleDrawImage(row, leftWrappingIndex-1, tile, ENEMY_HEIGHT); // Draw the tile to the screen
+                if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
+            }
+        sleepTicks(tickNumber); // sleep for tickNumber ticks
+        leftWrappingIndex--;
+      }
       row++;
+      leftWrappingIndex = size-2; // reset the variable to original value
     }
     
     if(flip){ // Move the column index variable one left  
