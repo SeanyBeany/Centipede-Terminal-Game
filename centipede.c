@@ -84,6 +84,7 @@ pthread_mutex_t character_mutex; // mutex for character
 pthread_mutex_t character_position_mutex; // mutex for character position
 pthread_mutex_t centipede_bullet_mutex; // Mutex for centipede bullet signal
 pthread_mutex_t bullet_location; // mutex for bullet location
+pthread_mutex_t collision_detection_mutex; // mutex for centipede collision detection
 pthread_cond_t end_signal; // mutex for signal to end program
 pthread_cond_t fire_signal; // mutex to signal a bullet can be fired
 pthread_cond_t centipede_bullet_signal; // Signal to create centipede
@@ -94,6 +95,9 @@ int gameOver = false; // boolean indicating that the game should end
 int hit = false; // boolean indicating whether the character has been hit or not
 int score = 0; // holds player score
 int bulletPos[2]; // holds the position a bullet should be created at
+int globalBulletCol[GLOBAL_BULLET_ARRAY_MAX]; // holds the col a bullet is at for collision detection
+int globalBulletRow[GLOBAL_BULLET_ARRAY_MAX]; // holds the row a bullet is at for collision detection
+int globalBulletIndex = 0; // holds the current index of bulletCol and bulletRow the bullet should be at
 
 void centipedeMain(int argc, char**argv) 
 {
@@ -107,6 +111,7 @@ void centipedeMain(int argc, char**argv)
     if(pthread_mutex_init(&character_position_mutex, NULL) != 0){perror("Mutex initialization failed");}
     if(pthread_mutex_init(&centipede_bullet_mutex, NULL) != 0){perror("Mutex initialization failed");}
     if(pthread_mutex_init(&bullet_location, NULL) != 0){perror("Mutex initialization failed");}
+    if(pthread_mutex_init(&collision_detection_mutex, NULL) != 0){perror("Mutex initialization failed");}
     if(pthread_cond_init(&end_signal, NULL) != 0){perror("Condition initialization failed");}
     if(pthread_cond_init(&fire_signal, NULL) != 0){perror("Condition initialization failed");}
     if(pthread_cond_init(&centipede_bullet_signal, NULL) != 0){perror("Condition initialization failed");}
@@ -146,6 +151,7 @@ void centipedeMain(int argc, char**argv)
     if(pthread_mutex_destroy(&character_position_mutex) != 0) {perror("Error destroying character position mutex");}
     if(pthread_mutex_destroy(&centipede_bullet_mutex) != 0) {perror("Error destroying centipede bullet mutex");}
     if(pthread_mutex_destroy(&bullet_location) != 0) {perror("Error destroying bullet location mutex");} 
+    if(pthread_mutex_destroy(&collision_detection_mutex) != 0) {perror("Error destroying collision detection mutex");} 
     if(pthread_cond_destroy(&end_signal) != 0){perror("Error destroying end signal");}
     if(pthread_cond_destroy(&fire_signal) != 0){perror("Error destroying fire signal");}
     if(pthread_cond_destroy(&centipede_bullet_signal) != 0){perror("Error destroying centipede bullet signal");}
@@ -198,10 +204,6 @@ void keyboard() {
                 if(pthread_cond_signal(&fire_signal) != 0){ perror("Error in pthread_cond_signal:");}
                 if(pthread_mutex_unlock(&character_mutex) != 0) {perror("Error unlocking");}
             }
-            else if(c == WIN_CONDITION_TESTING){ // This is for the marker to show that I do have a win condition (press the r button to test it until 4000 score is reached)
-                score += 200;
-                if(pthread_mutex_unlock(&character_mutex) != 0) {perror("Error unlocking");}
-            }
             else {
                 /** check user character input and if it is wasd it will move the character in the
                  * corresponding direction locking character_position_mutex as character position
@@ -250,6 +252,17 @@ void bullet() {
     char** bulletTile = BULLET[0]; //setting a pointer to the bullet icon pointer
     int bulletHeight = 0; //the height of the bullet
     int offScreen = 0; //variable to check if bullet if offscreen
+    if(pthread_mutex_lock(&collision_detection_mutex) != 0) {perror("Error locking");}
+    int bulletIndex = globalBulletIndex; // set current index to a global index in the 2 position arrays
+    if(globalBulletIndex != 9){ // increment globalBulletIndex so no two bullets on screen have the same index value
+        globalBulletIndex++;
+    }
+    else { // increment by setting equal to the first index to avoid array overflow
+        globalBulletIndex = 0;
+    }
+    if(pthread_mutex_unlock(&collision_detection_mutex) != 0) {perror("Error locking");}
+
+    
     
     //set bullet coordinates to player coordinates
     int bulletRow = characterRow; 
@@ -264,6 +277,10 @@ void bullet() {
             bulletHeight++; //increment bulletHeight
             consoleDrawImage(bulletRow-bulletHeight, bulletCol, bulletTile, BULLET_HEIGHT); //draw new bullet above old one
             if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
+            if(pthread_mutex_lock(&collision_detection_mutex) != 0) {perror("Error locking");}
+            globalBulletCol[bulletIndex] = bulletCol;
+            globalBulletRow[bulletIndex] = bulletRow-bulletHeight;
+            if(pthread_mutex_unlock(&collision_detection_mutex) != 0) {perror("Error locking");}
         }
         else {
             /** if the bullet is offScreen clear the image and break the loop so that the thread can be joined */
@@ -271,6 +288,9 @@ void bullet() {
             consoleClearImage(bulletRow-bulletHeight, bulletCol, BULLET_HEIGHT, strlen(bulletTile[0]));
             if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
             offScreen = 1;
+            if(pthread_mutex_lock(&collision_detection_mutex) != 0) {perror("Error locking");} 
+            globalBulletRow[bulletIndex] = 0; // to avoid collision with a bullet offScreen
+            if(pthread_mutex_unlock(&collision_detection_mutex) != 0) {perror("Error locking");}
         }
     }
     
@@ -468,8 +488,7 @@ void upkeep() {
 /** function that creates a centipede that crawls across the board and shoots bullets
  * that are handled by the centipedeBullet function
  */
-void centipede(int row, int col) {
-    int size = 8; // size of the caterpillar
+void centipede(int row, int col, int size) {
     int j = -7; // used to calculate the correct column index to draw and clear centipede segments
     int flip = false; //Variable to determine if the centipede was flipped
     char** tile;
@@ -480,131 +499,145 @@ void centipede(int row, int col) {
     int rightWrappingIndex = 80-size+1; // index used for caterpillar wrapping when hitting the right boarder of the game board
     int leftWrappingIndex = size-2; // index used for caterpillar wrapping when hitting the left boarder of the game board
     while(!gameOver){
-    pthread_mutex_lock(&character_mutex); //If character gets hit pause the animation
-    pthread_mutex_unlock(&character_mutex);
-    
-    if(row == 11) { //If centipede hits the bottom of the screen delete it and create a new centipede at the top
-        if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
-        consoleClearImage(row, j, 1, size);
-        if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
-        row = 2;
-        col = 0;
-        j = -7;
-        flip = false;
-        changeAnimation = false;
-    }
+        pthread_mutex_lock(&character_mutex); //If character gets hit pause the animation
+        pthread_mutex_unlock(&character_mutex);
+        
+        if(row == 11) { //If centipede hits the bottom of the screen delete it and create a new centipede at the top
+            if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
+            consoleClearImage(row, j, 1, size);
+            if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
+            row = 2;
+            col = 0;
+            j = -7;
+            flip = false;
+            changeAnimation = false;
+        }
 
-    if(col+j >= BOARD_RIGHT_BORDER-size){ //If the centipede is at the right side of the screen set boolean flip to true and animate the centipede wrapping downward
-        flip = true; //sets boolean true if the centipede flipped (is on an odd row)
+        if(col+j >= BOARD_RIGHT_BORDER-size){ //If the centipede is at the right side of the screen set boolean flip to true and animate the centipede wrapping downward
+            flip = true; //sets boolean true if the centipede flipped (is on an odd row)
+            for(int j = 0; j < size; j++) { // wrapping animation for the centipede
+                pthread_mutex_lock(&character_mutex); //If character gets hit pause the animation
+                pthread_mutex_unlock(&character_mutex);
+                for (int i = 0; i<size; i++) { //loop over the whole centipede animation once 
+                    tile = ENEMY_BODY[i];
+                    if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
+                    consoleClearImage(row, rightWrappingIndex-1, 1, 1);  // Clear the previous segment drawing in front of the centipede
+                    if(rightWrappingIndex+i >= BOARD_RIGHT_BORDER) { // if the centipede is off the screen start drawing it below going in the opposite direction
+                        consoleDrawImage(row+1, BOARD_RIGHT_BORDER-size+i, tile, ENEMY_HEIGHT); // Draw the tile to the screen
+                    }
+                    consoleDrawImage(row, rightWrappingIndex, tile, ENEMY_HEIGHT); // Draw the tile to the screen
+                    if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
+                }
+            sleepTicks(tickNumber); // sleep for tickNumber ticks
+            rightWrappingIndex++;
+        }
+        row++;
+        rightWrappingIndex = 80-size+1; // reset the variable to original value
+        }
+
+        if(col+j <= 0 && flip == true) { //If the centipede is at the left side of the screen set flip to false and animate the centipede wrapping downward
+        flip = false; //sets boolean false if the centipede flipped (is on an even row)
         for(int j = 0; j < size; j++) { // wrapping animation for the centipede
-            pthread_mutex_lock(&character_mutex); //If character gets hit pause the animation
-            pthread_mutex_unlock(&character_mutex);
-            for (int i = 0; i<size; i++) { //loop over the whole centipede animation once 
-                tile = ENEMY_BODY[i];
-                if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
-                consoleClearImage(row, rightWrappingIndex-1, 1, 1);  // Clear the previous segment drawing in front of the centipede
-                if(rightWrappingIndex+i >= BOARD_RIGHT_BORDER) { // if the centipede is off the screen start drawing it below going in the opposite direction
-                    consoleDrawImage(row+1, BOARD_RIGHT_BORDER-size+i, tile, ENEMY_HEIGHT); // Draw the tile to the screen
+                pthread_mutex_lock(&character_mutex); //If character gets hit pause the animation
+                pthread_mutex_unlock(&character_mutex);
+                for (int i = 0; i<size; i++) { //loop over the whole centipede animation once 
+                    tile = ENEMY_BODY[i];
+                    if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
+                    consoleClearImage(row, leftWrappingIndex+1, 1, 1);  // Clear the previous segment drawing in front of the centipede
+                    if(leftWrappingIndex-i < BOARD_LEFT_BORDER) { // if the centipede is off the screen start drawing it below going in the opposite direction
+                        consoleDrawImage(row+1, BOARD_LEFT_BORDER+size-i-1, tile, ENEMY_HEIGHT); // Draw the tile to the screen
+                    }
+                    consoleDrawImage(row, leftWrappingIndex-1, tile, ENEMY_HEIGHT); // Draw the tile to the screen
+                    if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
                 }
-                consoleDrawImage(row, rightWrappingIndex, tile, ENEMY_HEIGHT); // Draw the tile to the screen
-                if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
-            }
-        sleepTicks(tickNumber); // sleep for tickNumber ticks
-        rightWrappingIndex++;
-      }
-      row++;
-      rightWrappingIndex = 80-size+1; // reset the variable to original value
-    }
-
-    if(col+j <= 0 && flip == true) { //If the centipede is at the left side of the screen set flip to false and animate the centipede wrapping downward
-      flip = false; //sets boolean false if the centipede flipped (is on an even row)
-      for(int j = 0; j < size; j++) { // wrapping animation for the centipede
-            pthread_mutex_lock(&character_mutex); //If character gets hit pause the animation
-            pthread_mutex_unlock(&character_mutex);
-            for (int i = 0; i<size; i++) { //loop over the whole centipede animation once 
-                tile = ENEMY_BODY[i];
-                if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
-                consoleClearImage(row, leftWrappingIndex+1, 1, 1);  // Clear the previous segment drawing in front of the centipede
-                if(leftWrappingIndex-i < BOARD_LEFT_BORDER) { // if the centipede is off the screen start drawing it below going in the opposite direction
-                    consoleDrawImage(row+1, BOARD_LEFT_BORDER+size-i-1, tile, ENEMY_HEIGHT); // Draw the tile to the screen
-                }
-                consoleDrawImage(row, leftWrappingIndex-1, tile, ENEMY_HEIGHT); // Draw the tile to the screen
-                if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
-            }
-        sleepTicks(tickNumber); // sleep for tickNumber ticks
-        leftWrappingIndex--;
-      }
-      row++;
-      leftWrappingIndex = size-2; // reset the variable to original value
-    }
-    
-    if(flip){ // Move the column index variable one left  
-      j--;
-    }
-    else {
-      j++; // move the column index variable one right
-    }
-
-    if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
-    consoleClearImage(row, j+col-1, 1, 1); // Clear the previous segment drawing behind the centipede
-    if(flip) {
-        consoleClearImage(row, j+size, 1, 1);  // Clear the previous segment drawing in front of the centipede
-    }
-    if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
-    for (int i = 0; i<size; i++) { //loop over the whole centipede animation once 
-      if(changeAnimation) { // If the animation is changed we use the first centipede animation
-        if(flip == false) { // if the centipede is flipped we draw it reversed, otherwise we draw it regularly
-          tile = ENEMY_BODY[i]; 
-            }
-        else {
-          tile = ENEMY_BODY[size-1-i];
-            }
+            sleepTicks(tickNumber); // sleep for tickNumber ticks
+            leftWrappingIndex--;
         }
-        else { // If the animation is not changed we use the second centipede animation
-        if(flip == false) { // if the centipede is flipped we set the tiles to be reversed, otherwise it is regular centipede tiles
-          tile = ENEMY_BODY2[i];
+        row++;
+        leftWrappingIndex = size-2; // reset the variable to original value
+        }
+        
+        if(flip){ // Move the column index variable one left  
+        j--;
         }
         else {
-            tile = ENEMY_BODY2[size-1-i];
+        j++; // move the column index variable one right
+        }
+
+        if(pthread_mutex_lock(&collision_detection_mutex) != 0) {perror("Error locking");} // collision detection for character bullet and centipede
+        for(int i = 0; i < size; i++) { // collision detection for character bullet
+            for(int k = 0; k < GLOBAL_BULLET_ARRAY_MAX; k++) {
+                if(globalBulletCol[k] == col+i+j && globalBulletRow[k] == row){ // check if the col and row is the same as bullet col and row for collision detection
+                    globalBulletRow[k] = 999; // avoid double collision
+                    score += 200;
+                }
             }
         }
+        if(pthread_mutex_unlock(&collision_detection_mutex) != 0) {perror("Error locking");}
+        
         if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
-        consoleDrawImage(row, col+i+j, tile, ENEMY_HEIGHT); // Draw the tile to the screen
-        if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
-    }
-    sleepTicks(tickNumber); // sleep for tickNumber ticks
-    if(loopsBeforeBullet == 0) { // if loopsBeforeBullet is 0 we create a new bullet below the centipede
-        if(pthread_mutex_lock(&bullet_location) != 0) {perror("Error locking:");}
+        consoleClearImage(row, j+col-1, 1, 1); // Clear the previous segment drawing behind the centipede
         if(flip) {
-            bulletPos[0] = row+1;
-            bulletPos[1] = col+j+4;
+            consoleClearImage(row, j+size, 1, 1);  // Clear the previous segment drawing in front of the centipede
+        }
+        if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
+        for (int i = 0; i<size; i++) { //loop over the whole centipede animation once 
+        if(changeAnimation) { // If the animation is changed we use the first centipede animation
+            if(flip == false) { // if the centipede is flipped we draw it reversed, otherwise we draw it regularly
+            tile = ENEMY_BODY[i]; 
+                }
+            else {
+            tile = ENEMY_BODY[size-1-i];
+                }
+            }
+            else { // If the animation is not changed we use the second centipede animation
+            if(flip == false) { // if the centipede is flipped we set the tiles to be reversed, otherwise it is regular centipede tiles
+            tile = ENEMY_BODY2[i];
+            }
+            else {
+                tile = ENEMY_BODY2[size-1-i];
+                }
+            }
+            if(pthread_mutex_lock(&board_mutex) != 0) {perror("Error locking:");}
+            consoleDrawImage(row, col+i+j, tile, ENEMY_HEIGHT); // Draw the tile to the screen
+            if(pthread_mutex_unlock(&board_mutex) != 0) {perror("Error unlocking:");}
+        }
+            
+
+        sleepTicks(tickNumber); // sleep for tickNumber ticks
+        if(loopsBeforeBullet == 0) { // if loopsBeforeBullet is 0 we create a new bullet below the centipede
+            if(pthread_mutex_lock(&bullet_location) != 0) {perror("Error locking:");}
+            if(flip) {
+                bulletPos[0] = row+1;
+                bulletPos[1] = col+j+4;
+            }
+            else {
+                bulletPos[0] = row+1;
+                bulletPos[1] = col+j+1;
+            }
+            if(pthread_cond_signal(&centipede_bullet_signal) != 0) {perror("Error signaling");}
+            if(gameOver) { // avoids centipede deadlocking
+                pthread_mutex_unlock(&bullet_location);
+            }
+            loopsBeforeBullet = 5;
         }
         else {
-            bulletPos[0] = row+1;
-            bulletPos[1] = col+j+1;
+            loopsBeforeBullet--;
         }
-        if(pthread_cond_signal(&centipede_bullet_signal) != 0) {perror("Error signaling");}
-        if(gameOver) { // avoids centipede deadlocking
-            pthread_mutex_unlock(&bullet_location);
-        }
-        loopsBeforeBullet = 5;
-    }
-    else {
-        loopsBeforeBullet--;
-    }
 
-    if(changeAnimation) { // if the animation was changed we change it back
-      changeAnimation = false;
-      loopCounter++;
-      if(tickNumber > 3 && loopCounter == 20){ // we decrement the tickNumber of the centipede which makes it move and shoot bullets faster
-        tickNumber--;
-        loopCounter = 0;
-      }
+        if(changeAnimation) { // if the animation was changed we change it back
+        changeAnimation = false;
+        loopCounter++;
+        if(tickNumber > 3 && loopCounter == 20){ // we decrement the tickNumber of the centipede which makes it move and shoot bullets faster
+            tickNumber--;
+            loopCounter = 0;
+        }
+        }
+        else {
+        changeAnimation = true;
+        }
+        
     }
-    else {
-      changeAnimation = true;
-    }
-  }
 }
 
 /** function that handles the bullet location for creating a centipede bullet
@@ -622,7 +655,7 @@ void* bulletLocation(void *v)
 void* centipedeLocation(void *v)
 {
   int* pos = (int*)v; // convert to int*
-  centipede(pos[0], pos[1]); //call method that handles the centipede
+  centipede(pos[0], pos[1], pos[2]); //call method that handles the centipede
 
   return NULL;
 }
@@ -633,7 +666,7 @@ void centipedeSpawner()
 {
   pthread_t enemy1[20];
   int r; // variable for random time between spawning centipedes
-  int pos1[] = {2,0};
+  int pos1[] = {2,0,8}; // row 2 col 0 size 8
   int threadNumber = 0; // number of threads spawned
   int i; // index for loop
   int maxEnemies = 5; // maximum number of enemies to spawn
@@ -735,7 +768,7 @@ void centipedeBulletArrayList() {
         insert_end(&head, &th[i]);
         threadCounter++;
         i++;
-        if(threadCounter-removeIndex > 60) { // joining the old offscreen threads (there can be over 50 bullets on screen at a time so for safety we clear after 60)
+        if(threadCounter-removeIndex > MAX_CENTIPEDE_BULLETS_ON_SCREEN) { // joining the old offscreen threads
             p = head->t;
             remove_head(&head);
             if(pthread_join(*p, NULL) !=0 ) {printf("Error joining thread");}
@@ -773,7 +806,7 @@ void characterBulletArrayList() {
         threadCounter++;
         i++;
         sleepTicks(60); // limits fire rate
-        if(threadCounter-removeIndex > 10) { // joining the old offscreen threads
+        if(threadCounter-removeIndex > MAX_CHARACTER_BULLETS_ON_SCREEN) { // joining the old offscreen threads
             p = head->t;
             remove_head(&head);
             if(pthread_join(*p, NULL) !=0 ) {printf("Error joining thread");}
