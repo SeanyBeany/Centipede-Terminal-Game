@@ -1,3 +1,10 @@
+/**********************************************************************
+  Module: centipede.h
+  Author: Shawn Whalen
+
+  Purpose: the .h file for centipede.c which defines all the macros and functions for the centipede.h program
+
+**********************************************************************/
 #ifndef EXAMPLE_H
 #define EXAMPLE_H
 

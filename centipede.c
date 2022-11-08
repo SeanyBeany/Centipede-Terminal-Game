@@ -1,3 +1,10 @@
+/**********************************************************************
+  Module: centipede.c
+  Author: Shawn Whalen
+
+  Purpose: Runs the centipede console game
+
+**********************************************************************/
 #include <stdio.h>
 #include <signal.h>
 #include <unistd.h>
@@ -458,12 +465,11 @@ void upkeep() {
     }
 }
 
-/********************************************************************************************************/
 /** function that creates a centipede that crawls across the board and shoots bullets
  * that are handled by the centipedeBullet function
  */
 void centipede(int row, int col) {
-    int size = 4; // size of the caterpillar
+    int size = 8; // size of the caterpillar
     int j = -7; // used to calculate the correct column index to draw and clear centipede segments
     int flip = false; //Variable to determine if the centipede was flipped
     char** tile;
